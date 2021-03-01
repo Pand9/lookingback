@@ -60,3 +60,7 @@ Taking a honest look at your process is a first step in improving productivity a
 - Need to install vscode
 - Setup a venv & set an env variable (i'll get to it when it's implemented)
 - That's it!
+
+## Why the name
+
+It was my first thought, it wasn't rational! However, the project's name works pretty well with its goal, as a time tracking tool - accessibility and ease of use.
