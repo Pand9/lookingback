@@ -1,0 +1,34 @@
+
+
+
+
+
+
+(got deleted - i don't feel like rewriting it right now)
+
+
+- easyaccess automator
+    - autoopen two recent files in vscode
+    - notify of notes getting out of date
+    - run report since last date
+    - document note format
+
+
+- easyaccess monitors
+    - pidof i3lock
+    - xidle
+    - i3-msg
+
+
+- easyaccess reporter
+    - total time per activity (window or idle/OOO)
+    - do something like - compress 1-second events into 15-minute aggregate events, and list them chronologically
+    - CLI obviously
+
+
+uncomfortable considerations
+- vscode plugin
+    - lint file
+
+
+- properly document & motivate principles behind this tool (blog post)
