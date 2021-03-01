@@ -2,6 +2,8 @@
 
 # Easyaccess
 
+(future name: SuperSlackerTimeTracker)
+
 Time tracking is not your main focus, so if you're supposed to do it, it must be super simple.
 
 This tool is doing its best to make time tracking
