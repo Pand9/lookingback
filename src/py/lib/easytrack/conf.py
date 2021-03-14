@@ -7,10 +7,16 @@ import os
 @dataclass(frozen=True, eq=True)
 class Conf:
     track_dir: Path
+    softlimit: int
+    hardlimit: int
 
 
 def validate_conf(conf) -> Conf:
-    return Conf(track_dir=Path(os.path.expanduser(conf["track_dir"])))
+    return Conf(
+        track_dir=Path(os.path.expanduser(conf["track_dir"])),
+        softlimit=int(conf["softlimit"]),
+        hardlimit=int(conf["hardlimit"]),
+    )
 
 
 def load_conf() -> Conf:
