@@ -1,17 +1,20 @@
 
+# Easytrack
 
-# Easyaccess
+A time-tracking tool designed to optimize success of tracking.
 
-(future name: SuperSlackerTimeTracker)
+## Functionality
 
-Time tracking is not your main focus, so if you're supposed to do it, it must be super simple.
+Time tracking is boring. It's not your job.
+Meticulous, systematic tracking is probably optional for you - not many companies are so strict as to enforce it.
+So it's expected that you're not very motivated to it.
+But - at the same time - the longer you ignore it, the harder it is to go back and fill missing entries.
+Dealing with it is what makes it very difficult to keep up with your time entries.
 
-This tool is doing its best to make time tracking
-
-- easy to do
-- easy to keep at (hard to forget about doing it)
-- easy to catch up when you stop
-- comfortable & honest
+This tool intends to address this problem, by
+- making time entering extremely simple & natural
+- assisting you in remembering (by tracking & showing you your OS activity)
+- setting regular reminders for you
 
 You type your entries into VSCode window, as a text. The Easyaccess framework deals with everything else.
 
@@ -20,35 +23,6 @@ You type your entries into VSCode window, as a text. The Easyaccess framework de
 - Get reminder after an hour of not entering anything.
 - Remember what you are doing by looking at system activity, such as focused windows and idle time. The data is being gathered in the background as you work.
 - Be honest in your entries, then redact them and send to Toggl.
-
-## Motivation
-
-The hard parts about time tracking are:
-- doing the actual boring chore (entering time)
-- not forgetting about it
-- remembering what you were doing - esp. if you forgot about doing it regularly
-- being honest with yourself about your activity
-
-The toolset won't solve your difficulties, but especially with honesty, but it's a good start.
-Main principles are:
-
-#### Accessibility (for developers)!
-
-The process of entering a time entry is always the same - use your shortcut, and then type "HH:MM - HH:MM (Human-readable description)". No varation, no web-interfaces, no mouse-pointing, no dropdowns.
-
-#### (Try to) observe yourself
-
-Self-observation is very hard, especially if something doesn't go right and you're not happy with yourself.
-
-If I had to name a single goal of this project, is to promote self-observation.
-
-- Look at your worklog often
-- Write your entry with your own words
-- Be honest, because it's private - if you need to export it, Easyaccess will help you rewrite it
-- Don't stress if you forget to log - system logs will help you get back on track
-- Be honest, again. Lack of observation is blocker to improvement. Feel even free to enter 8 hours of "leisure time", because noone else will see it, and it will help you be honest with yourself about it.
-
-Taking a honest look at your process is a first step in improving productivity and estimation skill, and is important to being a honest & happy developer.
 
 ## Technical details
 - Supported setup for event gatherer: x11 + i3 wm. If you have a different setup - DIY, it's easy!
