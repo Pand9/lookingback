@@ -7,6 +7,11 @@ def to_json(x):
     return json.dumps(make_serializable(x))
 
 
+def to_json_file(x, f):
+    json.dump(x, f)
+    f.write("\n")
+
+
 def make_serializable(x):
     if dataclasses.is_dataclass(x):
         x = dataclasses.asdict(x)

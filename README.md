@@ -40,3 +40,30 @@ You type your entries into VSCode window, as a text. The Easyaccess framework de
 ## Why the name
 
 It was my first thought, it wasn't rational! However, the project's name works pretty well with its goal, as a time tracking tool - accessibility and ease of use.
+
+# Guides
+
+## Example on how to setup background processes
+
+Configure to run this on login.
+
+```bash
+# recreate screens that maintain background process
+
+# send screen-specific "quit" command to last session to clean it up
+screen -S easytrack-remind -X quit
+# create the new session from scratch, in detached state
+screen -dmS easytrack-remind
+# use screen-specific "stuff" command to send
+# the command into the detached session
+screen -S easytrack-remind -X stuff 'watch -n300 /home/ks/personal/easyinsert/src/bash/run.sh remind\n'
+
+
+# send screen-specific "quit" command to last session to clean it up
+screen -S easytrack-monitor -X quit
+# create the new session from scratch, in detached state
+screen -dmS easytrack-monitor
+# use screen-specific "stuff" command to send
+# the command into the detached session
+screen -S easytrack-monitor -X stuff 'watch -n60 /home/ks/personal/easyinsert/src/bash/run.sh monitor --ticks 60\n'
+```
