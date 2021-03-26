@@ -11,11 +11,11 @@ if [[ -z ${track_dir} ]]; then exit 1; fi
 track_dir="${track_dir//\~/$HOME}"
 mkdir -p "$track_dir"
 
-err="$track_dir/run.err"
-lock="$track_dir/run.lock"
+err="$track_dir/monitor_run.err"
+lock="$track_dir/monitor_run.lock"
 
 echo "$(date -Iseconds)| running $0 $@" >> "$err"
 (
     flock --wait 5 --verbose 9 1>> "$err" || exit 1
-    python3 "$(dirname $0)/../py/run.py" $@ |& tee --append "$err"
+    python3 "$(dirname $0)/../py/run.py" monitor $@ |& tee --append "$err"
 ) 9> "$lock"
