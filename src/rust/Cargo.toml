@@ -1,0 +1,17 @@
+[package]
+name = "easytrack-reducer"
+version = "0.1.0"
+authors = ["Krzysztof Stanisławek <krzysztof.stanislawek@beacon.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+chrono = "0.4"
+structopt = "0.3"
+lazy_static = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = { version = "0.4" }
+env_logger = "0.7"
