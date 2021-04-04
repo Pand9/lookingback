@@ -6,7 +6,7 @@ import subprocess
 from subprocess import PIPE
 
 from easytrack.conf import Conf, load_conf
-from easytrack.json import to_json
+from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
 from easytrack.trackdir import Trackdir
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from subprocess import PIPE, SubprocessError
 from time import sleep
 
-from easytrack.json import to_json_file
+from easytrack.jsonfmt import to_json_file
 from easytrack.time import now, round_time
 
 log = logging.getLogger(__name__)

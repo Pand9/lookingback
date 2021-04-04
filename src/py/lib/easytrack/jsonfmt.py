@@ -7,8 +7,10 @@ def to_json(x):
     return json.dumps(make_serializable(x))
 
 
-def to_json_file(x, f):
-    json.dump(x, f)
+def to_json_file(x, f, raw=True, indent=None):
+    if not raw:
+        x = make_serializable(x)
+    json.dump(x, f, indent=indent)
     f.write("\n")
 
 
