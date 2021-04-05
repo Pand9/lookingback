@@ -221,10 +221,10 @@ def parse_filename(f: str) -> datetime.date:
 if __name__ == "__main__":
     content = """
 2021-04-02
-11:00 5h 15m | [dev] ftrs
-20m | [dev] tsdb
+11:00 5h 15m | [dev] dfa
+20m | [dev] ggh
 2021-03-03
-3h | tsdb [planning]
+3h | ggh [planning]
     """
     db = AliasDB("/home/ks/workdir/trackdir/toggl_aliases.json")
     aliases = db.get_aliases()

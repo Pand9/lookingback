@@ -61,14 +61,22 @@ def toggl_add_entries(
             e.line = e
             raise
 
-    for togglentry in togglentries:
+    for i, togglentry in enumerate(togglentries, start=1):
         try:
-            resp = toggl.postRequest(Endpoints.TIME_ENTRIES, {"time_entry": togglentry})
-        except urllib.error.HTTPError as e:
-            raise TogglError(body=e.fp.read().decode(), underlying=e)
-        resp = toggl.decodeJSON(resp)
-        if resp.get("data") is None:
-            raise ConvertingError(f"data not found in resp {resp}")
+            try:
+                resp = toggl.postRequest(
+                    Endpoints.TIME_ENTRIES, {"time_entry": togglentry}
+                )
+            except urllib.error.HTTPError as e:
+                raise TogglError(body=e.fp.read().decode(), underlying=e)
+            resp = toggl.decodeJSON(resp)
+            if resp.get("data") is None:
+                raise ConvertingError(f"data not found in resp {resp}")
+        except ConvertingError as e:
+            e.i = i
+            e.line = e
+            raise
+
     # te = togglrequest['time_entry'][0]
     # toggl.createTimeEntry(3, 'desc', year=2021, month=4, day=5, taskid=te['tid'], projectid=te['pid'])
 
@@ -77,9 +85,9 @@ if __name__ == "__main__":
     content = """
 2021-04-05
 11:00 5h 15m | [dev] asd
-20m | [dev] tsdb
+20m | [dev] ddf
 2021-04-04
-3h | tsdb [planning]
+3h | ddf [planning]
     """
     from easytrack.togglexport.alias_db import AliasDB
     from easytrack.togglexport.task_db import TaskDB

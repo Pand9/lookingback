@@ -20,20 +20,24 @@ class MappingError(Exception):
 def toggl_get_entries(
     date: datetime.date, tasks: List[TglTask], aliases: List[Alias], token=None
 ) -> List[TglStandardEntry]:
+    togglentries = toggl_get_entries_raw(date, token)
+    return parse_entries(togglentries, tasks, aliases)
+
+
+def toggl_get_entries_raw(date: datetime.date, token=None):
     toggl = Toggl()
     if token is None:
         token = os.getenv("TOGGL_API_TOKEN")
     toggl.setAPIKey(token)
 
     start_date = datetime.datetime.combine(date, datetime.time()).astimezone()
-    params = {
-        'start_date': start_date.isoformat()
-    }
-    params["end_date"] = (start_date + datetime.timedelta(days=1)).isoformat()
+    params = {"start_date": start_date.isoformat()}
+    params["end_date"] = (
+        start_date + datetime.timedelta(days=1) + datetime.timedelta(minutes=-1)
+    ).isoformat()
 
     togglentries = toggl.request(Endpoints.TIME_ENTRIES, params)
-
-    return parse_entries(togglentries, tasks, aliases)
+    return togglentries
 
 
 def parse_entries(togglentries, tasks: List[TglTask], aliases: List[Alias]):
@@ -84,9 +88,10 @@ def parse_entries(togglentries, tasks: List[TglTask], aliases: List[Alias]):
 if __name__ == "__main__":
     from easytrack.togglexport.alias_db import AliasDB
     from easytrack.togglexport.task_db import TaskDB
+
     aliases = AliasDB("/home/ks/workdir/trackdir/toggl_aliases.json").get_aliases()
     tasks = TaskDB("/home/ks/workdir/trackdir/toggl_task_cache.json").get_tasks()
-    d = datetime.date(2021, 3, 4)
+    d = datetime.date(2021, 4, 4)
     res = toggl_get_entries(d, tasks, aliases)
     for r in res:
         print(r)
