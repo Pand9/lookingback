@@ -1,13 +1,13 @@
 import datetime
+import logging
+import os
 from dataclasses import dataclass
 from functools import lru_cache
-import os
-from typing import List, Tuple, Optional
-import logging
-import pyparsing as pp
+from typing import List, Optional, Tuple
 
-from easytrack.togglexport.entry import TglStandardEntry
+import pyparsing as pp
 from easytrack.togglexport.alias_db import Alias, AliasDB
+from easytrack.togglexport.entry import TglStandardEntry
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +107,8 @@ class _TogglfileParser:
 
     def _parse_line(self, i: int, line: str):
         try:
+            if line[0] == "#":
+                return
             date_match = try_parse_date(line)
             if date_match:
                 self.date = date_match
