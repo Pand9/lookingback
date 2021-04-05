@@ -156,7 +156,7 @@ def try_parse_timeentry(line):
 
     return {
         "tags": list(res.tag),
-        "desc": " ".join(res.desc.strip).strip(),
+        "desc": " ".join([d.strip() for d in res.desc]).strip(),
         "first_time": datetime.time(int(res.start_hour), int(res.start_minute))
         if res.start_hour
         else None,
@@ -220,7 +220,7 @@ def parse_filename(f: str) -> datetime.date:
 
 if __name__ == "__main__":
     content = """
-2021-02-02
+2021-04-02
 11:00 5h 15m | [dev] ftrs
 20m | [dev] tsdb
 2021-03-03
