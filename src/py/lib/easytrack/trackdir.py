@@ -20,11 +20,26 @@ class TrackdirState:
         res = [f for f in self.actives if f.day == today()]
         return res[0] if res else None
 
+    def activedir(self) -> Path:
+        return self.dirpath / "active"
+
     def today_trackfile_path(self) -> Path:
         return self.dirpath / "active" / today().strftime("%Y.%m.%d.today.easytrack")
 
     def statusfile_path(self) -> Path:
         return self.dirpath / "status.md"
+
+    def exportstatus_file(self) -> Path:
+        return self.dirpath / "export_status.md"
+
+    def exporting_file(self) -> Path:
+        return self.activedir() / "export_input.easyexport"
+
+    def toggl_taskcache_path(self) -> Path:
+        return self.dirpath / "toggl_task_cache.json"
+
+    def toggl_aliases_path(self) -> Path:
+        return self.dirpath / "toggl_aliases.json"
 
 
 class Trackdir:
@@ -36,6 +51,10 @@ class Trackdir:
 
         for d in active_dir, finished_dir, exported_dir:
             d.mkdir(exist_ok=True)
+
+        for p in self.state.exportstatus_file(), self.state.exporting_file():
+            if not p.exists():
+                p.open("w").close()
 
         active_trackfiles = []
 

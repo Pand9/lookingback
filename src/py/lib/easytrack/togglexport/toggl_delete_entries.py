@@ -1,8 +1,9 @@
-from typing import List
 import datetime
 import os
+from typing import List
+
 from easytrack.togglexport.toggl_get_entries import toggl_get_entries_raw
-from toggl.TogglPy import Toggl, Endpoints
+from toggl.TogglPy import Endpoints, Toggl
 
 
 class TogglError(Exception):
@@ -35,7 +36,7 @@ def toggl_delete_entries_for_ids(ids, token=None):
 
 
 def toggl_http_request(toggl, endpoint, method):
-    from urllib.request import urlopen, Request
+    from urllib.request import Request, urlopen
 
     req = Request(endpoint, headers=toggl.headers, method=method)
     resp = urlopen(req).read()

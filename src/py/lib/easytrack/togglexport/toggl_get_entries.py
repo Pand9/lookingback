@@ -1,10 +1,11 @@
-from typing import List
 import datetime
 import os
-from easytrack.togglexport.entry import TglStandardEntry
+from typing import List
+
 from easytrack.togglexport.alias_db import Alias
+from easytrack.togglexport.entry import TglStandardEntry
 from easytrack.togglexport.toggl_get_tasks import TglTask
-from toggl.TogglPy import Toggl, Endpoints
+from toggl.TogglPy import Endpoints, Toggl
 
 
 class MappingError(Exception):
@@ -18,9 +19,9 @@ class MappingError(Exception):
 
 
 def toggl_get_entries(
-    date: datetime.date, tasks: List[TglTask], aliases: List[Alias], token=None
+    dates: List[datetime.date], tasks: List[TglTask], aliases: List[Alias], token=None
 ) -> List[TglStandardEntry]:
-    togglentries = toggl_get_entries_raw(date, token)
+    togglentries = [e for d in dates for e in toggl_get_entries_raw(d, token)]
     return parse_entries(togglentries, tasks, aliases)
 
 
@@ -92,6 +93,6 @@ if __name__ == "__main__":
     aliases = AliasDB("/home/ks/workdir/trackdir/toggl_aliases.json").get_aliases()
     tasks = TaskDB("/home/ks/workdir/trackdir/toggl_task_cache.json").get_tasks()
     d = datetime.date(2021, 4, 4)
-    res = toggl_get_entries(d, tasks, aliases)
+    res = toggl_get_entries([d], tasks, aliases)
     for r in res:
         print(r)

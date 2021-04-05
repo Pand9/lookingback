@@ -8,6 +8,9 @@ from subprocess import PIPE
 from easytrack.conf import Conf, load_conf
 from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
+from easytrack.togglexport.calc_status import calc_status
+from easytrack.togglexport.run_export import run_export
+from easytrack.togglexport.task_db import TaskDB
 from easytrack.trackdir import Trackdir
 
 log = logging.getLogger(__name__)
@@ -40,6 +43,33 @@ def common_routine(conf: Conf):
             elif duration.seconds // 60 >= conf.softlimit:
                 _send_reminder(duration, critical=False)
     return trackdir
+
+
+def toggl_status(conf: Conf, local: bool = False):
+    trackdir = Trackdir(conf).state
+    calc_status(
+        trackdir.toggl_taskcache_path(),
+        trackdir.toggl_aliases_path(),
+        trackdir.exportstatus_file(),
+        trackdir.exporting_file(),
+        local=local,
+    )
+
+
+def toggl_export(conf: Conf):
+    trackdir = Trackdir(conf).state
+    run_export(
+        trackdir.toggl_taskcache_path(),
+        trackdir.toggl_aliases_path(),
+        trackdir.exportstatus_file(),
+        trackdir.exporting_file(),
+    )
+    toggl_status(conf)
+
+
+def toggl_download_tasks(conf: Conf):
+    trackdir = Trackdir(conf).state
+    TaskDB(trackdir.toggl_taskcache_path()).cache_refresh()
 
 
 def _run_monitor(conf: Conf, ticks: int):
@@ -77,6 +107,9 @@ def run_cli():
     monitor_parser = subparsers.add_parser("monitor")
     setup_monitor_parser(monitor_parser)
 
+    toggl_parser = subparsers.add_parser("toggl")
+    setup_toggl_parser(toggl_parser)
+
     args = parser.parse_args()
 
     logging.basicConfig(level="INFO" if not args.verbose else "DEBUG")
@@ -92,6 +125,13 @@ def run_cli():
         common_routine(conf)
     elif args.cmd == "monitor":
         _run_monitor(conf, args.ticks)
+    elif args.cmd == "toggl":
+        if args.toggl_cmd == "download-tasks":
+            toggl_download_tasks(conf)
+        elif args.toggl_cmd == "status":
+            toggl_status(conf, args.local)
+        elif args.toggl_cmd == "export":
+            toggl_export(conf)
 
 
 def setup_trackdir_parser(parser):
@@ -104,6 +144,14 @@ def setup_monitor_parser(parser):
     parser.add_argument(
         "--ticks", default=60, type=int, help="how many monitor ticks per a process run"
     )
+
+
+def setup_toggl_parser(parser):
+    subparsers = parser.add_subparsers(dest="toggl_cmd", required=True)
+    _ = subparsers.add_parser("download-tasks")
+    validate = subparsers.add_parser("status")
+    validate.add_argument("--local", action="store_true")
+    _ = subparsers.add_parser("export")
 
 
 if __name__ == "__main__":
