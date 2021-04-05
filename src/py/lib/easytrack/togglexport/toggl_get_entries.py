@@ -60,7 +60,7 @@ def parse_entries(togglentries, tasks: List[TglTask], aliases: List[Alias]):
 
     for i, e in enumerate(togglentries, start=1):
         try:
-            k = (e["pid"], e["tid"])
+            k = (e["pid"], e.get("tid", 0))
             alias = taskmap.get(k)
             if alias is None:
                 raise MappingError(f"Task {k} not found in the local database")

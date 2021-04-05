@@ -50,7 +50,7 @@ def toggl_add_entries(
             togglentry = {
                 "description": entry.description,
                 "pid": pid,
-                "tid": tid,
+                "tid": tid if tid else None,
                 "start": entry.start.astimezone().isoformat(),
                 "duration": entry.duration.seconds,
                 "created_with": "easytrack",

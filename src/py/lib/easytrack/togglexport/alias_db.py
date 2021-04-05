@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, List
+from typing import List, Union
 
 from easytrack.jsonfmt import to_json_file
 
@@ -10,7 +10,7 @@ from easytrack.jsonfmt import to_json_file
 class Alias:
     alias: Union[str, List[str]]
     project: str
-    task: str
+    task: str = ""
 
     def aliases(self):
         if isinstance(self.alias, str):
