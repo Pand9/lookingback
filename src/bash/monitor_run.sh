@@ -1,10 +1,11 @@
 #!/bin/bash
 
 if [[ $EASYTRACK_PYTHON_VENV_ACTIVATE ]]; then
-    echo "activating easytrack venv" 1>&2
+    # echo "activating easytrack venv" 1>&2
     source "$EASYTRACK_PYTHON_VENV_ACTIVATE"
 else
-    echo "not activating easytrack venv" 1>&2
+    :
+    # echo "not activating easytrack venv" 1>&2
 fi
 
 export PYTHONPATH="$PYTHONPATH:$(dirname $0)/../py/lib"
