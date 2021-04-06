@@ -10,10 +10,10 @@ pub struct ReportOpts {
     #[structopt(
         long,
         parse(from_os_str),
-        default_value = "/home/ks/workdir/trackdir/monitor/monitor.2021-03-21_19:40.log"
+        default_value = "/home/ks/workdir/trackdir/monitor/"
     )]
     pub monitor_dir: PathBuf,
-    #[structopt(long, parse(try_from_str = parse_datetime), default_value = "2021-03-20_12:00")]
+    #[structopt(long, parse(try_from_str = parse_datetime), default_value = "2021-04-04_00:00")]
     pub from: DateTime<Local>,
     #[structopt(long, parse(try_from_str = parse_datetime))]
     pub to: Option<DateTime<Local>>,

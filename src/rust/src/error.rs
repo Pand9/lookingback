@@ -1,3 +1,5 @@
+use std::path::Path;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
     pub msg: String,
@@ -17,6 +19,11 @@ impl Error {
     pub fn from<E: std::error::Error>(msg: &str, err: E) -> Self {
         Self {
             msg: format!("{}; error: {:?}", msg, err),
+        }
+    }
+    pub fn from_file<E: std::error::Error>(msg: &str, filename: &Path, err: E) -> Self {
+        Self {
+            msg: format!("{}; path: {:?}; error: {:?}", msg, filename, err),
         }
     }
 }
