@@ -84,11 +84,13 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
             .timestamp
             .duration_trunc(duration)
             .unwrap();
-        (from, Some(from + duration))
+        let opts_to = opts.to.unwrap_or_else(|| Local::now());
+        let to = std::cmp::min(opts_to, from + duration);
+        (from, Some(to))
     };
     let mut groups: HashMap<String, (u64, u64)> = Default::default();
     for rec in recs {
-        let tag = rec.window_title.unwrap_or("no window".to_owned());
+        let tag = make_tag(&rec);
         let idle = rec.idle_msecs.unwrap_or(0) >= 5000;
         let mut entry = groups.entry(tag.clone()).or_default();
         if idle {
@@ -119,6 +121,22 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
         total_idle_ticks,
         parts,
     })
+}
+
+fn make_tag(rec: &AssembledRecord) -> String {
+    let title = rec.window_title.clone().unwrap_or("no window".to_owned());
+    if title.ends_with("Visual Studio Code") {
+        if let Some(workspace_end) = title.rfind('-') {
+            if let Some(workspace_start) = title[..workspace_end].rfind('-') {
+                let wpc = title[workspace_start + 2..].trim_start();
+                return wpc.to_string();
+            }
+        }
+    }
+    if title.ends_with("Google Chrome") {
+        return "Google Chrome".to_string();
+    }
+    title
 }
 
 fn maybe_deserialize_minute<'de, D>(d: D) -> std::result::Result<Option<DateTime<Local>>, D::Error>
