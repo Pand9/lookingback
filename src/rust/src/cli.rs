@@ -21,6 +21,9 @@ pub struct ReportOpts {
     pub chunk_minutes: u64,
     #[structopt(long, default_value = "0")]
     pub chunk_colors: u64,
+
+    #[structopt(long, default_value = "simple")]
+    pub format: String,
 }
 
 pub const FMT: &'static str = "%Y-%m-%d_%H:%M";

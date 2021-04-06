@@ -1,12 +1,12 @@
 pub mod cli;
 pub mod error;
 pub mod record;
+pub mod summary;
 use std::{
-    collections::HashMap,
-    fmt::Display,
     fs::{self, File},
     io::{BufRead, BufReader},
     mem,
+    path::PathBuf,
 };
 
 use chrono::{DateTime, Duration, DurationRound, Local, TimeZone};
@@ -14,12 +14,63 @@ use cli::ReportOpts;
 use error::{Error, Result};
 use record::{AssembledRecord, Record};
 use structopt::StructOpt;
+use summary::make_summary;
 
 pub const FMT: &'static str = "monitor.%Y-%m-%d_%H:%M.log";
 
 fn main() -> Result<()> {
     let opts = ReportOpts::from_args();
     let mut records: Vec<Record> = vec![];
+    let paths = get_filenames(&opts)?;
+    for path in &paths {
+        let file = File::open(&path)?;
+        let lines = BufReader::new(file).lines();
+        for (i, line) in lines.enumerate() {
+            let line = line?;
+            let line = line.trim_end();
+            if line.is_empty() {
+                continue;
+            }
+            let record: Record = match serde_json::from_str(&line.trim_end()) {
+                Ok(rec) => rec,
+                Err(e) => {
+                    log::info!(
+                        "Problem {} with file {:?}, line {}: {}",
+                        e,
+                        path,
+                        i,
+                        &line[..100]
+                    );
+                    continue;
+                }
+            };
+            records.push(record);
+        }
+    }
+    let records = assemble(records)?;
+    let record_chunks = split_chunks(records, opts.chunk_minutes)?;
+    let mut summaries = vec![];
+    for records in record_chunks {
+        summaries.push(make_summary(records, &opts)?);
+    }
+    if opts.format == "simple" {
+        for summary in summaries {
+            println!("{}", summary);
+        }
+    } else if opts.format == "jsonstream" {
+        for summary in summaries {
+            println!("{}", serde_json::to_string(&summary)?);
+        }
+    } else if opts.format == "jsonpretty" {
+        println!("{}", serde_json::to_string_pretty(&summaries)?);
+    } else {
+        println!("unsupported format {}", opts.format);
+    }
+    Ok(())
+}
+
+fn get_filenames(opts: &ReportOpts) -> Result<Vec<PathBuf>> {
+    let mut res = vec![];
     match fs::read_dir(&opts.monitor_dir) {
         Ok(dir_entries) => {
             for entry in dir_entries {
@@ -41,30 +92,7 @@ fn main() -> Result<()> {
                 if opts.to.map(|to| to <= dtime).unwrap_or(false) {
                     continue;
                 }
-                let file = File::open(&entry.path())?;
-                let lines = BufReader::new(file).lines();
-                for (i, line) in lines.enumerate() {
-                    let line = line?;
-                    let line = line.trim_end();
-                    if line.is_empty() {
-                        continue;
-                    }
-                    let record: Record = match serde_json::from_str(&line.trim_end()) {
-                        Ok(rec) => rec,
-                        Err(e) => {
-                            log::info!(
-                                "Problem {} with file {:?}, line {}: {}",
-                                e,
-                                entry.path(),
-                                i,
-                                &line[..100]
-                            );
-                            continue;
-                        }
-                    };
-
-                    records.push(record);
-                }
+                res.push(entry.path());
             }
         }
         Err(error) => {
@@ -75,16 +103,8 @@ fn main() -> Result<()> {
             ))
         }
     };
-    let records = assemble(records)?;
-    let record_chunks = split_chunks(records, opts.chunk_minutes)?;
-    let mut summaries = vec![];
-    for records in record_chunks {
-        summaries.push(make_summary(records, &opts)?);
-    }
-    for summary in summaries {
-        println!("{}", summary);
-    }
-    Ok(())
+    res.sort();
+    Ok(res)
 }
 
 fn extract_date(s: &str) -> Result<DateTime<Local>> {
@@ -166,71 +186,4 @@ fn split_chunks(
         }
         Ok(res)
     }
-}
-
-struct Summary {
-    pub dt: DateTime<Local>,
-    pub parts: Vec<SummaryPart>,
-}
-
-impl Display for Summary {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Bucket {}:\n", self.dt.format(FMT))?;
-        for (i, part) in self.parts.iter().enumerate() {
-            write!(
-                f,
-                "{}: \"{}\". {}s busy, {}s idle\n",
-                i + 1,
-                part.tag,
-                part.ticks,
-                part.idle_ticks
-            )?;
-        }
-        Ok(())
-    }
-}
-
-struct SummaryPart {
-    pub tag: String,
-    pub ticks: u64,
-    pub idle_ticks: u64,
-}
-
-fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Summary> {
-    assert!(!recs.is_empty());
-    let dt = if opts.chunk_minutes == 0 {
-        opts.from.clone()
-    } else {
-        let duration = Duration::minutes(opts.chunk_minutes as i64);
-        recs.first()
-            .unwrap()
-            .timestamp
-            .duration_trunc(duration)
-            .unwrap()
-    };
-    let mut groups: HashMap<String, (u64, u64)> = Default::default();
-    for rec in recs {
-        let tag = rec.window_title.unwrap_or("no window".to_owned());
-        let idle = rec.idle_msecs.unwrap_or(0) >= 1000;
-        let mut entry = groups.entry(tag.clone()).or_default();
-        if idle {
-            entry.1 += 1;
-        } else {
-            entry.0 += 1;
-        }
-    }
-    let mut groups: Vec<(String, (u64, u64))> = groups.into_iter().collect();
-    groups.sort_by_key(|e| -((e.1 .0 + e.1 .1) as i64));
-    if opts.chunk_colors != 0 {
-        groups.truncate(opts.chunk_colors as usize);
-    }
-    let groups = groups
-        .into_iter()
-        .map(|e| SummaryPart {
-            tag: e.0,
-            ticks: e.1 .0,
-            idle_ticks: e.1 .1,
-        })
-        .collect();
-    Ok(Summary { dt, parts: groups })
 }
