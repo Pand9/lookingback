@@ -1,6 +1,5 @@
 import datetime
 import logging
-import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import List, Optional, Tuple
@@ -208,16 +207,6 @@ def parse_time(t) -> datetime.time:
     if len(t) == 5:
         m = int(t[3:5])
     return datetime.time(h, m)
-
-
-def parse_filename(f: str) -> datetime.date:
-    f = os.path.basename(f)
-    if f.endswith(".today.easytrack"):
-        f = f[:-16]
-    elif f.endswith(".easytrack"):
-        f = f[:-10]
-
-    return datetime.datetime.strptime(f, "%Y.%m.%d").date()
 
 
 if __name__ == "__main__":
