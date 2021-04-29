@@ -91,7 +91,7 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
     let mut groups: HashMap<String, (u64, u64)> = Default::default();
     for rec in recs {
         let tag = make_tag(&rec);
-        let idle = rec.idle_msecs.unwrap_or(0) >= 5000;
+        let idle = rec.idle_msecs.unwrap_or(0) >= 15000;
         let mut entry = groups.entry(tag.clone()).or_default();
         if idle {
             entry.1 += 1;
@@ -135,6 +135,23 @@ fn make_tag(rec: &AssembledRecord) -> String {
     }
     if title.ends_with("Google Chrome") {
         return "Google Chrome".to_string();
+    }
+    if title.ends_with("Chromium") {
+        return "Chromium".to_string();
+    }
+    if title.starts_with("Slack |") {
+        if let Some(prefix_end) = title.find('|') {
+            if let Some(wpc_start) = title[prefix_end + 1..].find('|') {
+                let wpc_start = wpc_start + prefix_end + 1;
+                let wpc_end = match title[wpc_start + 1..].find('|') {
+                    Some(wpc_end) => wpc_end + wpc_start,
+                    None => title.len(),
+                };
+                let mut res = title[..prefix_end].to_string();
+                res.push_str(&title[wpc_start..wpc_end]);
+                return res;
+            }
+        }
     }
     title
 }
