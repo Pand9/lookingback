@@ -1,30 +1,68 @@
+edge cases & error handling:
+- put fileformat errors within .status file
+- don't parse any files just to open a workspace
+- report system errors using `alert` and cli command `get latest logs`
+- log retency configuration
 
 
+togglexport:
+✔ define & parse togglfile format @done(21-04-29 14:45)
+✔ query for (with and without tasks) upload of entries @done(21-04-29 14:45)
+✔ query for deletion of entries @done(21-04-29 14:45)
+✔ query for download of entries @done(21-04-29 14:45)
+✔ query for download of definitions of clients, projects, tasks @done(21-04-29 14:45)
+✔ show toggl system entries & delta @done(21-04-29 14:45)
+✔ cache clients, projects & tasks @done(21-04-29 14:45)
+✔ let user define human friendly names of toggl projects & tasks @done(21-04-29 14:45)
+✔ implement cli workflow with dry-run phase @done(21-04-29 14:46)
+- show deleted entries in summary
+- show validation errors in summary
+- relax syntax to support simple "8h dev core-dev work"
+- support deleting (exporting empty set)
+- support standalone togglexport workspace
+- document syntax
+- support different toggl accounts
+- safe store for credentials
 
 
-
-- easyaccess automator
-    - autoopen two recent files in vscode
-    - notify of notes getting out of date
-    - run report since last date
-    - document note format
-
-
-- easyaccess monitors
-    - pidof i3lock
-    - xidle
-    - i3-msg
-
-
-- easyaccess reporter
-    - total time per activity (window or idle/OOO)
-    - do something like - compress 1-second events into 15-minute aggregate events, and list them chronologically
-    - CLI obviously
+easyaccess journal:
+✔ bootstrap & validate workspace
+✔ sort files based on `FINISHED`, `EXPORTED` tags
+✔ add cli command to open in vscode
+✔ report info about last note time within .status file
+- support adding time in the short future
+✔ notify of notes getting out of date
+✔ autoopen one recent file in vscode
+- autoopen two recent files
+- run report since last date
+✔ document note format
+- document directory structure
 
 
-uncomfortable considerations
+easyaccess monitors:
+✔ main loop @done(21-04-29 14:54)
+✔ write to workspace @done(21-04-29 14:54)
+✔ xidle
+✔ wmctrl
+✔ xdotool
+
+
+easyaccess reporter:
+✔ toplist of activities (active window/browser tab, or idle) per total time, for X-minute intervals
+- special case for chrome tabs, vscode projects etc. with configurable level of detail
+✔ CLI
+- expose in the main CLI
+
+
+runtime environment:
+- document dependencies
+- provide bootstrap scripts for setting up screens
+
+
+future considerations:
+- let user somehow define reducer: window name -> aggregate instead of hardcoding
+    - second aggregation can be in python
 - vscode plugin
     - lint file
+- build into a standalone binary
 
-
-- properly document & motivate principles behind this tool (blog post)
