@@ -81,6 +81,7 @@ def time_re():
 
 def parse_time(t) -> datetime.time:
     h = int(t[0:2])
+    m = 0
     if len(t) == 5:
         m = int(t[3:5])
     return datetime.time(h, m)
