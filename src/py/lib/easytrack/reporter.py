@@ -17,7 +17,7 @@ def transform_report_row(report_row, features):
             res_parts[tag]["idle_ticks"] += part["idle_ticks"]
 
     res = copy.deepcopy({k: v for (k, v) in report_row.items() if k != "parts"})
-    res["parts"] = res_parts
+    res["parts"] = sorted(res_parts.values(), key=lambda v: -v['ticks'])
     return res
 
 
@@ -42,3 +42,24 @@ def make_tag(tag: str, features):
     if "chromium-name" in features and tag.endswith(" - Chromium"):
         return "Chromium"
     return tag
+
+
+def print_basic_format(report_rows, fileobj):
+    def _print(*a, **kw):
+        print(*a, **kw, file=fileobj)
+
+    _print(f"{len(report_rows)} chunks:")
+    _print()
+    for row in report_rows:
+        total = row["total_ticks"] + row["total_idle_ticks"] + row["untracked_ticks"]
+        tbusy = round(row["total_ticks"] / total * 100)
+        tidle = round(row["total_idle_ticks"] / total * 100)
+        tuntracked = round(row["untracked_ticks"] / total * 100)
+        _print(
+            f'{row["from"]}-{row["to"]} - {tbusy}% busy, {tidle}% idle, {tuntracked}% untracked:'
+        )
+        for i, part in enumerate(row["parts"], start=1):
+            pbusy = round(part["ticks"] / total * 100)
+            pidle = round(part["idle_ticks"] / total * 100)
+            _print(f'{i:2}: {pbusy}% busy, {pidle}% idle - {part["tag"]}')
+        _print()

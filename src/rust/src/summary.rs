@@ -22,6 +22,7 @@ pub struct Summary {
     pub to: Option<DateTime<Local>>,
     pub total_ticks: u64,
     pub total_idle_ticks: u64,
+    pub untracked_ticks: Option<i64>,
     pub parts: Vec<SummaryPart>,
 }
 
@@ -29,9 +30,8 @@ impl Display for Summary {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let ftotal = (self.total_ticks + self.total_idle_ticks) as f64;
         let percent_tracked = {
-            if let Some(to) = &self.to {
-                let d = to.signed_duration_since(self.from);
-                format!("{:.0}", ftotal / (d.num_seconds() as f64) * 100f64)
+            if let Some(untracked) = self.untracked_ticks {
+                format!("{:.0}", ftotal / (ftotal + untracked as f64) * 100f64)
             } else {
                 "??".to_string()
             }
@@ -101,6 +101,15 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
             total_ticks += 1;
         }
     }
+    let untracked_ticks = if let Some(to) = &to {
+        Some(
+            to.signed_duration_since(from).num_seconds()
+                - total_ticks as i64
+                - total_idle_ticks as i64,
+        )
+    } else {
+        None
+    };
     let mut groups: Vec<(String, (u64, u64))> = groups.into_iter().collect();
     groups.sort_by_key(|e| -((e.1 .0 + e.1 .1) as i64));
     if opts.chunk_colors != 0 {
@@ -119,6 +128,7 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
         to,
         total_ticks,
         total_idle_ticks,
+        untracked_ticks,
         parts,
     })
 }

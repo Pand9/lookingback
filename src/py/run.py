@@ -6,13 +6,14 @@ import logging
 import os
 import shlex
 import subprocess
+import sys
 from subprocess import PIPE
 
 import dateutil.parser
 from easytrack.conf import Conf, load_conf
 from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
-from easytrack.reporter import transform_report
+from easytrack.reporter import print_basic_format, transform_report
 from easytrack.togglexport.calc_status import calc_status
 from easytrack.togglexport.run_export import run_export
 from easytrack.togglexport.task_db import TaskDB
@@ -110,7 +111,16 @@ def reporter_report(conf: Conf, input_args):
     report = transform_report(report, input_args.features)
     if input_args.output != "-":
         raise ValueError('Only output "-" supported for now')
-    print(json.dumps(report, indent=4))
+
+    if input_args.format == "jsonpretty":
+        print(json.dumps(report, indent=4))
+    elif input_args.format == "jsonstream":
+        for row in report:
+            print(json.dumps(row))
+    elif input_args.format == "basic":
+        print_basic_format(report, sys.stdout)
+    else:
+        raise ValueError(f"Unsupported format {input_args.format}")
 
 
 def _run_monitor(conf: Conf, ticks: int):
@@ -219,7 +229,11 @@ def setup_reporter_parser(parser):
         default=0,
         help="top x categories in a single aggregate",
     )
-    report.add_argument("--format", default="basic", help="output format")
+    report.add_argument(
+        "--format",
+        default="basic",
+        help="output format, basic jsonstream or jsonpretty",
+    )
     report.add_argument("--features", nargs="*", help="enable various report features")
     report.add_argument(
         "--output", default="-", help='supported are "-" (default) and "workspace"'
