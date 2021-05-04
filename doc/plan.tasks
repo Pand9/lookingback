@@ -52,6 +52,7 @@ easyaccess reporter:
 - special case for chrome tabs, vscode projects etc. with configurable level of detail
 ✔ CLI
 - expose in the main CLI
+- include "untracked" in report toplist, and scale the rest to the full time and not tracked time
 
 
 runtime environment:
