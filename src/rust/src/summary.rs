@@ -124,36 +124,7 @@ pub fn make_summary(recs: Vec<AssembledRecord>, opts: &ReportOpts) -> Result<Sum
 }
 
 fn make_tag(rec: &AssembledRecord) -> String {
-    let title = rec.window_title.clone().unwrap_or("no window".to_owned());
-    if title.ends_with("Visual Studio Code") {
-        if let Some(workspace_end) = title.rfind('-') {
-            if let Some(workspace_start) = title[..workspace_end].rfind('-') {
-                let wpc = title[workspace_start + 2..].trim_start();
-                return wpc.to_string();
-            }
-        }
-    }
-    if title.ends_with("Google Chrome") {
-        return "Google Chrome".to_string();
-    }
-    if title.ends_with("Chromium") {
-        return "Chromium".to_string();
-    }
-    if title.starts_with("Slack |") {
-        if let Some(prefix_end) = title.find('|') {
-            if let Some(wpc_start) = title[prefix_end + 1..].find('|') {
-                let wpc_start = wpc_start + prefix_end + 1;
-                let wpc_end = match title[wpc_start + 1..].find('|') {
-                    Some(wpc_end) => wpc_end + wpc_start,
-                    None => title.len(),
-                };
-                let mut res = title[..prefix_end].to_string();
-                res.push_str(&title[wpc_start..wpc_end]);
-                return res;
-            }
-        }
-    }
-    title
+    rec.window_title.clone().unwrap_or("no window".to_owned())
 }
 
 fn maybe_deserialize_minute<'de, D>(d: D) -> std::result::Result<Option<DateTime<Local>>, D::Error>

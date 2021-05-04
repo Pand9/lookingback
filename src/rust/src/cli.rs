@@ -13,7 +13,7 @@ pub struct ReportOpts {
         default_value = "/home/ks/workdir/trackdir/monitor/"
     )]
     pub monitor_dir: PathBuf,
-    #[structopt(long, parse(try_from_str = parse_datetime), default_value = "2021-04-04_00:00")]
+    #[structopt(long, parse(try_from_str = parse_datetime), default_value = "2021-04-04T00:00")]
     pub from: DateTime<Local>,
     #[structopt(long, parse(try_from_str = parse_datetime))]
     pub to: Option<DateTime<Local>>,
@@ -26,7 +26,7 @@ pub struct ReportOpts {
     pub format: String,
 }
 
-pub const FMT: &'static str = "%Y-%m-%d_%H:%M";
+pub const FMT: &'static str = "%Y-%m-%dT%H:%M";
 
 pub fn parse_datetime(s: &str) -> Result<DateTime<Local>> {
     Ok(Local.datetime_from_str(s, FMT)?)

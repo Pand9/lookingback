@@ -64,7 +64,7 @@ fn main() -> Result<()> {
     } else if opts.format == "jsonpretty" {
         println!("{}", serde_json::to_string_pretty(&summaries)?);
     } else {
-        println!("unsupported format {}", opts.format);
+        eprintln!("unsupported format {}", opts.format);
     }
     Ok(())
 }
