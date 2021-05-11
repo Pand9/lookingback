@@ -22,22 +22,20 @@ from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
 from easytrack.reporter import print_basic_format, transform_report
 from easytrack.togglexport.calc_status import calc_status
+from easytrack.statusfile import rewrite_statusfile
 from easytrack.togglexport.run_export import run_export
-from easytrack.togglexport.task_db import TaskDB
-from easytrack.trackdir import Trackdir
+from typing import Union
+from easytrack.trackdir import TrackdirToggl, TrackdirTrackfiles
 
 log = logging.getLogger(__name__)
 
 
-def open_trackdir(conf: Conf):
-    trackdir = common_routine(conf)
+def open_trackdir(conf: Conf, dir_cls: Union[TrackdirToggl, TrackdirTrackfiles]):
     subprocess.run(
         [
             "code",
             conf.track_dir,
-            *(f.path for f in trackdir.state.actives),
-            trackdir.state.statusfile_path(),
-            os.path.expanduser("~/.config/easytrack/config.toml"),
+            *dir_cls.init_novalidate(conf).paths_to_open(conf),
         ],
         stdout=PIPE,
         stderr=PIPE,
@@ -46,20 +44,25 @@ def open_trackdir(conf: Conf):
 
 
 def common_routine(conf: Conf):
-    trackdir = Trackdir(conf)
-    actives = trackdir.state.actives
-    if actives:
-        duration = actives[0].duration_from_lasttime()
+    trackdir = TrackdirTrackfiles.init(conf)
+    if trackdir.actives:
+        duration = trackdir.actives[0].duration_from_lasttime()
         if duration is not None:
             if duration.seconds // 60 >= conf.hardlimit:
                 _send_reminder(duration, critical=True)
             elif duration.seconds // 60 >= conf.softlimit:
                 _send_reminder(duration, critical=False)
+
+    log.debug("conf: %s", repr(conf))
+    log.debug("trackdir: %s", repr(trackdir.state))
+
+    rewrite_statusfile(conf, trackdir.state)
+
     return trackdir
 
 
 def toggl_status(conf: Conf, local: bool = False):
-    trackdir = Trackdir(conf).state
+    trackdir = TrackdirToggl.init(conf)
     calc_status(
         trackdir.toggl_taskcache_path(),
         trackdir.toggl_aliases_path(),
@@ -70,7 +73,7 @@ def toggl_status(conf: Conf, local: bool = False):
 
 
 def toggl_export(conf: Conf):
-    trackdir = Trackdir(conf).state
+    trackdir = TrackdirToggl.init(conf)
     run_export(
         trackdir.toggl_taskcache_path(),
         trackdir.toggl_aliases_path(),
@@ -81,8 +84,7 @@ def toggl_export(conf: Conf):
 
 
 def toggl_download_tasks(conf: Conf):
-    trackdir = Trackdir(conf).state
-    TaskDB(trackdir.toggl_taskcache_path()).cache_refresh()
+    TrackdirToggl.init(conf).download_tasks()
 
 
 def ensure_rust_bin() -> Tuple[List[str], str]:
@@ -179,7 +181,7 @@ def _send_reminder(duration, critical=False):
             )
         )
     else:
-        raise ValueError(f'unknown EASYTRACK_ALERT_METHOD value {alert_method}')
+        raise ValueError(f"unknown EASYTRACK_ALERT_METHOD value {alert_method}")
 
 
 @contextmanager
@@ -232,7 +234,7 @@ def logging_setup(input_args, workdir_path: Path):
     if log_variant == "file":
         filename = workdir_path / f"{datetime.date.today()}.reporter.log"
         handler = logging.FileHandler(str(filename))
-        handler.setLevel('INFO')
+        handler.setLevel("INFO")
         logging.getLogger().addHandler(handler)
 
     logging.info(f'Running "{shlex.join(sys.argv)}"')
@@ -258,9 +260,9 @@ def run_cli():
         if args.cmd == "trackdir":
             if args.trackdir_cmd == "prep":
                 common_routine(conf)
-                logging.info('Finished prepping the trackdir')
+                logging.info("Finished prepping the trackdir")
             elif args.trackdir_cmd == "open":
-                open_trackdir(conf)
+                open_trackdir(conf, TrackdirTrackfiles)
         elif args.cmd == "config":
             print(to_json(conf))
         elif args.cmd == "remind":
@@ -274,6 +276,8 @@ def run_cli():
                 toggl_status(conf, args.local)
             elif args.toggl_cmd == "export":
                 toggl_export(conf)
+            elif args.toggl_cmd == "open":
+                open_trackdir(conf, TrackdirToggl)
         elif args.cmd == "reporter":
             if args.reporter_cmd == "report":
                 reporter_report(conf, args)
@@ -300,6 +304,7 @@ def setup_toggl_parser(parser):
     validate = setup_common(subparsers.add_parser("status"))
     validate.add_argument("--local", action="store_true")
     _ = subparsers.add_parser("export")
+    _ = subparsers.add_parser("open")
 
 
 def setup_reporter_parser(parser):

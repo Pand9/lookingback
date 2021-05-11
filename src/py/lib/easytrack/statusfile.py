@@ -1,17 +1,17 @@
 from easytrack.conf import Conf
 from easytrack.time import today
-from easytrack.trackdir import Trackdir
+from easytrack.trackdir import TrackdirTrackfiles
 import datetime
 
 
-def rewrite_statusfile(conf: Conf, trackdir: Trackdir):
+def rewrite_statusfile(conf: Conf, trackdir: TrackdirTrackfiles):
     def _print(*a, **kw):
         print(*a, **kw, file=statusfile)
 
     curtime = datetime.datetime.now().time()
 
-    with trackdir.state.statusfile_path().open("w") as statusfile:
-        actives = trackdir.state.actives
+    with trackdir.statusfile_path().open("w") as statusfile:
+        actives = trackdir.actives
         _print("# Easytrack status report")
         _print()
         _print("Generated:", curtime.isoformat(timespec="seconds"))

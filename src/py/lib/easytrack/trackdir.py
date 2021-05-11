@@ -6,6 +6,7 @@ from typing import List
 
 from easytrack.conf import Conf
 from easytrack.time import now, today
+from easytrack.togglexport.task_db import TaskDB
 from easytrack.trackfile import Trackfile, TrackfileState
 
 log = logging.getLogger(__name__)
@@ -15,9 +16,56 @@ log = logging.getLogger(__name__)
 class TrackdirStateBeforeValidation:
     dirpath: Path
 
+    def activedir(self) -> Path:
+        return self.dirpath / "active"
+
+    def paths_to_open(self, conf: Conf):
+        return [conf.conf_path]
+
 
 @dataclass
-class TrackdirState(TrackdirStateBeforeValidation):
+class TrackdirToggl(TrackdirStateBeforeValidation):
+    def toggl_taskcache_path(self) -> Path:
+        return self.dirpath / "toggl_task_cache.json"
+
+    def toggl_aliases_path(self) -> Path:
+        return self.dirpath / "toggl_aliases.json"
+
+    def exportstatus_file(self) -> Path:
+        return self.dirpath / "export_status.md"
+
+    def exporting_file(self) -> Path:
+        return self.activedir() / "export_input.easyexport"
+
+    @classmethod
+    def init_novalidate(cls, conf: Conf) -> "TrackdirToggl":
+        return cls(dirpath=conf.track_dir)
+
+    @classmethod
+    def init(cls, conf: Conf) -> "TrackdirToggl":
+        state = TrackdirToggl(dirpath=conf.track_dir)
+        state.activedir().mkdir(exist_ok=True)
+
+        for p in state.exportstatus_file(), state.exporting_file():
+            if not p.exists():
+                p.open("w").close()
+
+        return state
+
+    def download_tasks(self):
+        TaskDB(self.toggl_taskcache_path()).cache_refresh()
+
+    def paths_to_open(self, conf: Conf):
+        return [
+            self.exporting_file(),
+            self.exportstatus_file(),
+            self.toggl_aliases_path(),
+            conf.conf_path,
+        ]
+
+
+@dataclass
+class TrackdirTrackfiles(TrackdirStateBeforeValidation):
     actives: List[TrackfileState]
 
     def today_trackfile(self) -> Path:
@@ -45,20 +93,22 @@ class TrackdirState(TrackdirStateBeforeValidation):
     def toggl_aliases_path(self) -> Path:
         return self.dirpath / "toggl_aliases.json"
 
+    @classmethod
+    def init_novalidate(cls, conf: Conf) -> "TrackdirTrackfiles":
+        state = TrackdirTrackfiles(conf.track_dir, actives=[])
+        state.activedir().mkdir(exist_ok=True)
+        with state.today_trackfile_path().open("a"):
+            log.debug("ensure .today.easytrack")
+        return state
 
-class Trackdir:
-    def __init__(self, conf: Conf):
-        self.state = TrackdirState(dirpath=conf.track_dir, actives=None)
-        active_dir = conf.track_dir / "active"
+    @classmethod
+    def init(cls, conf: Conf) -> "TrackdirTrackfiles":
+        state = cls.init_novalidate(conf)
+        active_dir = state.activedir()
         finished_dir = conf.track_dir / "finished"
         exported_dir = conf.track_dir / "exported"
-
         for d in active_dir, finished_dir, exported_dir:
             d.mkdir(exist_ok=True)
-
-        for p in self.state.exportstatus_file(), self.state.exporting_file():
-            if not p.exists():
-                p.open("w").close()
 
         active_trackfiles = []
 
@@ -72,9 +122,8 @@ class Trackdir:
             if f.state.exported:
                 rename(p, "exported")
 
-        with self.state.today_trackfile_path().open("a"):
+        with state.today_trackfile_path().open("a"):
             log.debug("ensure .today.easytrack")
-            pass
 
         for p in active_dir.iterdir():
             if str(p).endswith("dup.easytrack"):
@@ -98,15 +147,21 @@ class Trackdir:
                 active_trackfiles.append(f)
 
         active_trackfiles.sort(key=lambda f: f.day, reverse=True)
+        return TrackdirTrackfiles(dirpath=state.dirpath, actives=active_trackfiles)
 
-        self.state.actives = active_trackfiles
-
-        from easytrack.statusfile import rewrite_statusfile
-
-        log.debug("conf: %s", repr(conf))
-        log.debug("trackdir: %s", repr(self.state))
-
-        rewrite_statusfile(conf, self)
+    def paths_to_open(self, conf: Conf):
+        if self.actives:
+            active_paths = [f.path for f in self.actives]
+        else:
+            active_paths = sorted(
+                (
+                    f
+                    for f in self.activedir().iterdir()
+                    if str(f).endswith(".easytrack")
+                ),
+                reverse=True,
+            )
+        return [*active_paths, self.statusfile_path(), conf.conf_path]
 
 
 def rename(p, target: str):
