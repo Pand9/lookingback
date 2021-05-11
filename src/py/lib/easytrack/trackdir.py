@@ -12,8 +12,12 @@ log = logging.getLogger(__name__)
 
 
 @dataclass
-class TrackdirState:
+class TrackdirStateBeforeValidation:
     dirpath: Path
+
+
+@dataclass
+class TrackdirState(TrackdirStateBeforeValidation):
     actives: List[TrackfileState]
 
     def today_trackfile(self) -> Path:

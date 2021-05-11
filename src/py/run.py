@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
+
 import argparse
 import datetime
+import errno
+import fcntl
 import json
 import logging
 import os
 import shlex
 import subprocess
 import sys
+import time
+from contextlib import contextmanager
+from pathlib import Path
 from subprocess import PIPE
+from typing import List, Tuple
 
 import dateutil.parser
 from easytrack.conf import Conf, load_conf
@@ -78,14 +85,27 @@ def toggl_download_tasks(conf: Conf):
     TaskDB(trackdir.toggl_taskcache_path()).cache_refresh()
 
 
+def ensure_rust_bin() -> Tuple[List[str], str]:
+    """Returns command prefix to run (cargo run ... --) and CWD path, based on env variables"""
+    rust_bin_value = os.getenv("EASYTRACK_RUST_REDUCER_BIN_PATH")
+    if rust_bin_value is None:
+        rust_src = os.getenv("EASYTRACK_RUST_SOURCE_PATH")
+        if rust_src is None:
+            bin_var = "EASYTRACK_RUST_REDUCER_BIN_PATH"
+            src_var = "EASYTRACK_RUST_SOURCE_PATH"
+            raise ValueError(f"neither {bin_var}, nor {src_var} provided")
+        cargo_run_args = shlex.split(os.getenv("EASYTRACK_RUST_CARGO_RUN_ARGS") or "")
+        return ["cargo", "run", *cargo_run_args, "--"], rust_src
+    else:
+        if not os.path.exists(rust_bin_value):
+            raise ValueError(f"rust binary path not found at {rust_bin_value}")
+        return [rust_bin_value], "."
+
+
 def reporter_report(conf: Conf, input_args):
-    rust_bin = os.getenv("EASYTRACK_REDUCER_RUST_BIN_PATH")
-    if rust_bin is None:
-        raise ValueError("rust binary path was not provided")
-    if not os.path.exists(rust_bin):
-        raise ValueError(f"rust binary path not found at {rust_bin}")
+    rust_bin, cwd = ensure_rust_bin()
     argv = [
-        rust_bin,
+        *rust_bin,
         "--from",
         serialize_arg_fromto(input_args.from_),
         "--to",
@@ -99,15 +119,19 @@ def reporter_report(conf: Conf, input_args):
         "--monitor-dir",
         str(conf.track_dir / "monitor"),
     ]
-    log.info('running "%s"', shlex.join(argv))
-    res = subprocess.run(argv, capture_output=True, text=True)
+    log.info('running "%s" in "%s"', shlex.join(argv), cwd)
+    res = subprocess.run(argv, capture_output=True, text=True, cwd=cwd)
     if res.returncode != 0:
         log.error("rust stdout: %s", res.stdout)
         log.error("rust stderr: %s", res.stderr)
         res.check_returncode()
     if res.stderr:
         log.warning("rust stderr: %s", res.stderr)
-    report = [json.loads(line) for line in res.stdout.split("\n") if line]
+    return _handle_report(input_args, res.stdout)
+
+
+def _handle_report(input_args, report_data: str):
+    report = [json.loads(line) for line in report_data.split("\n") if line]
     report = transform_report(report, input_args.features)
     if input_args.output != "-":
         raise ValueError('Only output "-" supported for now')
@@ -133,78 +157,158 @@ def _run_monitor(conf: Conf, ticks: int):
 
 
 def _send_reminder(duration, critical=False):
-    cmd = ["notify-send"]
-    if critical:
-        cmd += ["--urgency=critical"]
-    cmd += ["--app-name=easytrack", "Remember to track time"]
-    cmd += [f"Elapsed {duration.seconds // 60} minutes since last time entry"]
-    subprocess.run(cmd, stdout=PIPE, stderr=PIPE, check=True)
+    duration_minutes = duration.seconds // 60
+    msg = f"Elapsed {duration_minutes} minutes since last time entry"
+    alert_method = os.getenv("EASYTRACK_ALERT_METHOD")
+    if alert_method == "notify-send":
+        cmd = ["notify-send"]
+        if critical:
+            cmd += ["--urgency=critical"]
+        cmd += ["--app-name=easytrack", "Remember to track time", msg]
+        log.info('running "%s"', shlex.join(cmd))
+        subprocess.run(cmd, stdout=PIPE, stderr=PIPE, check=True)
+    elif alert_method == os.getenv("EASYTRACK_ALERT_METHOD") == "stdout":
+        print(
+            json.dumps(
+                {
+                    "type": "alert",
+                    "msg": msg,
+                    "duration_minutes": duration_minutes,
+                    **({"is_critical": True} if critical else {}),
+                }
+            )
+        )
+    else:
+        raise ValueError(f'unknown EASYTRACK_ALERT_METHOD value {alert_method}')
+
+
+@contextmanager
+def spinlock(lock_path: Path):
+    lock_file = lock_path.open("w")
+    while True:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except OSError as e:
+            if e.errno == errno.EAGAIN:
+                print("file locked; trying again in 1s", file=sys.stderr)
+                time.sleep(1)
+            else:
+                raise
+    yield
+    fcntl.flock(lock_file, fcntl.LOCK_UN)
+    lock_file.close()
+
+
+@contextmanager
+def workdir_setup(conf: Conf, input_args):
+    cmd = input_args.cmd
+    if cmd == "config":
+        yield
+        return
+    elif cmd in ("trackdir", "remind"):
+        workdir_name = "trackdir"
+    else:
+        workdir_name = cmd
+
+    try:
+        workdir_path = conf.track_dir / "workdir" / workdir_name
+        workdir_path.mkdir(parents=True, exist_ok=True)
+        with spinlock(workdir_path / "lock"):
+            logging_setup(input_args, workdir_path)
+            yield
+    except OSError as e:
+        raise Exception(f"Locking error for {workdir_path}") from e
+
+
+def logging_setup(input_args, workdir_path: Path):
+    log_level = "INFO" if not input_args.verbose else "DEBUG"
+    log_variant = os.getenv("EASYTRACK_LOG_OUTPUT")
+    logging.basicConfig(
+        format="%(asctime)s.%(msecs)03d|%(levelname).1s|%(lineno)3d| %(message)s",
+        datefmt="%F_%T",
+        level=log_level,
+    )
+    if log_variant == "file":
+        filename = workdir_path / f"{datetime.date.today()}.reporter.log"
+        handler = logging.FileHandler(str(filename))
+        handler.setLevel('INFO')
+        logging.getLogger().addHandler(handler)
+
+    logging.info(f'Running "{shlex.join(sys.argv)}"')
 
 
 def run_cli():
     conf = load_conf()
 
-    parser = argparse.ArgumentParser(description="Run different easytrack components")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser = setup_common(
+        argparse.ArgumentParser(description="Run different easytrack components")
+    )
     subparsers = parser.add_subparsers(dest="cmd", required=True)
     setup_trackdir_parser(subparsers.add_parser("trackdir"))
-    _ = subparsers.add_parser("config")
-    _ = subparsers.add_parser("remind")
+    setup_common(subparsers.add_parser("config"))
+    setup_common(subparsers.add_parser("remind"))
     setup_monitor_parser(subparsers.add_parser("monitor"))
     setup_toggl_parser(subparsers.add_parser("toggl"))
     setup_reporter_parser(subparsers.add_parser("reporter"))
 
     args = parser.parse_args()
 
-    logging.basicConfig(level="INFO" if not args.verbose else "DEBUG")
-
-    if args.cmd == "trackdir":
-        if args.trackdir_cmd == "prep":
+    with workdir_setup(conf, args):
+        if args.cmd == "trackdir":
+            if args.trackdir_cmd == "prep":
+                common_routine(conf)
+                logging.info('Finished prepping the trackdir')
+            elif args.trackdir_cmd == "open":
+                open_trackdir(conf)
+        elif args.cmd == "config":
+            print(to_json(conf))
+        elif args.cmd == "remind":
             common_routine(conf)
-        elif args.trackdir_cmd == "open":
-            open_trackdir(conf)
-    elif args.cmd == "config":
-        print(to_json(conf))
-    elif args.cmd == "remind":
-        common_routine(conf)
-    elif args.cmd == "monitor":
-        _run_monitor(conf, args.ticks)
-    elif args.cmd == "toggl":
-        if args.toggl_cmd == "download-tasks":
-            toggl_download_tasks(conf)
-        elif args.toggl_cmd == "status":
-            toggl_status(conf, args.local)
-        elif args.toggl_cmd == "export":
-            toggl_export(conf)
-    elif args.cmd == "reporter":
-        if args.reporter_cmd == "report":
-            reporter_report(conf, args)
+        elif args.cmd == "monitor":
+            _run_monitor(conf, args.ticks)
+        elif args.cmd == "toggl":
+            if args.toggl_cmd == "download-tasks":
+                toggl_download_tasks(conf)
+            elif args.toggl_cmd == "status":
+                toggl_status(conf, args.local)
+            elif args.toggl_cmd == "export":
+                toggl_export(conf)
+        elif args.cmd == "reporter":
+            if args.reporter_cmd == "report":
+                reporter_report(conf, args)
 
 
 def setup_trackdir_parser(parser):
+    setup_common(parser)
     subparsers = parser.add_subparsers(dest="trackdir_cmd", required=True)
-    _ = subparsers.add_parser("prep")
-    _ = subparsers.add_parser("open")
+    _ = setup_common(subparsers.add_parser("prep"))
+    _ = setup_common(subparsers.add_parser("open"))
 
 
 def setup_monitor_parser(parser):
+    setup_common(parser)
     parser.add_argument(
         "--ticks", default=60, type=int, help="how many monitor ticks per a process run"
     )
 
 
 def setup_toggl_parser(parser):
+    setup_common(parser)
     subparsers = parser.add_subparsers(dest="toggl_cmd", required=True)
     _ = subparsers.add_parser("download-tasks")
-    validate = subparsers.add_parser("status")
+    validate = setup_common(subparsers.add_parser("status"))
     validate.add_argument("--local", action="store_true")
     _ = subparsers.add_parser("export")
 
 
 def setup_reporter_parser(parser):
+    setup_common(parser)
     subparsers = parser.add_subparsers(dest="reporter_cmd", required=True)
-    report = subparsers.add_parser(
-        "report", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    report = setup_common(
+        subparsers.add_parser(
+            "report", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
     )
     default_to = parse_arg_fromto(
         serialize_arg_fromto(datetime.datetime.now())
@@ -246,6 +350,13 @@ def parse_arg_fromto(arg):
 
 def serialize_arg_fromto(arg: datetime.datetime) -> str:
     return arg.astimezone().strftime("%Y-%m-%dT%H:%M")
+
+
+def setup_common(parser):
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="print useful troubleshooting info"
+    )
+    return parser
 
 
 if __name__ == "__main__":
