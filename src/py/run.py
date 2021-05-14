@@ -14,18 +14,18 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from subprocess import PIPE
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import dateutil.parser
 from easytrack.conf import Conf, load_conf
 from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
 from easytrack.reporter import print_basic_format, transform_report
-from easytrack.togglexport.calc_status import calc_status
 from easytrack.statusfile import rewrite_statusfile
+from easytrack.togglexport.calc_status import calc_status
 from easytrack.togglexport.run_export import run_export
-from typing import Union
 from easytrack.trackdir import TrackdirToggl, TrackdirTrackfiles
+from easytrack.vacuum import do_vacuum
 
 log = logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ def workdir_setup(conf: Conf, input_args):
     if cmd == "config":
         yield
         return
-    elif cmd in ("trackdir", "remind"):
+    elif cmd in ("trackdir", "remind", "vacuum"):
         workdir_name = "trackdir"
     else:
         workdir_name = cmd
@@ -232,7 +232,7 @@ def logging_setup(input_args, workdir_path: Path):
         level=log_level,
     )
     if log_variant == "file":
-        filename = workdir_path / f"{datetime.date.today()}.reporter.log"
+        filename = workdir_path / f"{datetime.date.today()}.log"
         handler = logging.FileHandler(str(filename))
         handler.setLevel("INFO")
         logging.getLogger().addHandler(handler)
@@ -253,6 +253,7 @@ def run_cli():
     setup_monitor_parser(subparsers.add_parser("monitor"))
     setup_toggl_parser(subparsers.add_parser("toggl"))
     setup_reporter_parser(subparsers.add_parser("reporter"))
+    setup_vacuum_parser(subparsers.add_parser("vacuum", help="clean old data"))
 
     args = parser.parse_args()
 
@@ -281,6 +282,14 @@ def run_cli():
         elif args.cmd == "reporter":
             if args.reporter_cmd == "report":
                 reporter_report(conf, args)
+        elif args.cmd == "vacuum":
+            do_vacuum(
+                conf,
+                verb=args.verb,
+                desc=args.desc,
+                advs=args.advs,
+                dry_run=args.dry_run,
+            )
 
 
 def setup_trackdir_parser(parser):
@@ -347,6 +356,14 @@ def setup_reporter_parser(parser):
     report.add_argument(
         "--output", default="-", help='supported are "-" (default) and "workspace"'
     )
+
+
+def setup_vacuum_parser(vacuum):
+    setup_common(vacuum)
+    vacuum.add_argument("verb", choices=["delete", "archive"])
+    vacuum.add_argument("desc", choices=["all", "old"])
+    vacuum.add_argument("advs", nargs="*", choices=["monits", "logs"])
+    vacuum.add_argument("--dry-run", action="store_true")
 
 
 def parse_arg_fromto(arg):
