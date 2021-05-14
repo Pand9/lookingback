@@ -24,6 +24,7 @@ togglexport:
 - document syntax
 - support different toggl accounts
 - safe store for credentials
+- batch toggl
 
 
 easyaccess journal:
@@ -38,6 +39,8 @@ easyaccess journal:
 - run report since last date
 ✔ document note format
 - document directory structure
+- when moving an empty file to .finished, delete it instead
+- batch finish old files
 
 
 easyaccess monitors:
