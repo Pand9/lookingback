@@ -1,3 +1,3 @@
 #!/bin/bash
 
-$(dirname $0)/run_noninteractive.sh reporter "$@"
+$(dirname $0)/run_noninteractive.sh monitor "$@"
