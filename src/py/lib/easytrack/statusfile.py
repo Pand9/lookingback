@@ -34,6 +34,16 @@ def rewrite_statusfile(conf: Conf, trackdir: TrackdirTrackfiles):
             else:
                 _print("No entries found within active files.")
 
+            if any(active.errors for active in actives):
+                _print()
+                _print('## File format errors')
+                _print()
+                for active in actives:
+                    if active.errors:
+                        _print(f'- File {_str_date(active.day)}')
+                        for error in active.errors:
+                            _print(f'    - Line {error.i}: {error.msg}')
+
         _print()
         _print("## Guide to the trackfile format")
         _print()

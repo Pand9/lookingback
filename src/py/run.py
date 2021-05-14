@@ -54,9 +54,9 @@ def common_routine(conf: Conf):
                 _send_reminder(duration, critical=False)
 
     log.debug("conf: %s", repr(conf))
-    log.debug("trackdir: %s", repr(trackdir.state))
+    log.debug("trackdir: %s", repr(trackdir))
 
-    rewrite_statusfile(conf, trackdir.state)
+    rewrite_statusfile(conf, trackdir)
 
     return trackdir
 

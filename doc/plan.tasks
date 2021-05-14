@@ -1,5 +1,7 @@
 edge cases & error handling:
 - put fileformat errors within .status file
+    ✔ trackfile @done(21-05-14 18:56)
+    - togglfile
 ✔ don't parse any files just to open a workspace @done(21-05-11 11:01)
 ✔ report system errors using `alert`
     ✘ and cli command `get latest logs`
