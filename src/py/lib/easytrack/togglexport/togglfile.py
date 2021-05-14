@@ -69,7 +69,7 @@ class _TogglfileParser:
                 if line:
                     self._parse_line(i, line)
             except ValidationError as e:
-                log.exception(f'Validation error: {e}')
+                log.exception(f"Validation error: {e}")
                 self.res.errors.append(e)
         return self.res
 
@@ -94,22 +94,25 @@ class _TogglfileParser:
 
     def _parse_timeentry_line(self, time_match):
         first_dtime, duration = self._parse_time(**time_match)
-        tags = time_match["tags"]
-        description = time_match["desc"]
 
+        tags = time_match["tags"]
         if len(tags) != 1:
             raise ValidationError(f"Expected one tag, got {tags}")
+        tag = tags[0]
+        del tags
 
-        alias = self.aliases.get(tags[0])
+        description = time_match["desc"]
+
+        alias = self.aliases.get(tag)
         if alias is None:
             raise ValidationError(
-                f"Alias \"{tags[0]}\" not found. Available aliases: {list(self.aliases)}"
+                f'Alias "{tag}" not found. Available aliases: {list(self.aliases)}'
             )
 
         entry = TglStandardEntry(
             start=first_dtime,
             duration=duration,
-            ptask_alias=tags[0],
+            ptask_alias=tag,
             project=alias.project,
             task=alias.task,
             description=description,
@@ -118,8 +121,6 @@ class _TogglfileParser:
 
     def _parse_line(self, i: int, line: str):
         try:
-            if line[0] == "#":
-                return
             date_match = try_parse_date(line)
             if date_match:
                 self.date = date_match
@@ -139,24 +140,20 @@ class _TogglfileParser:
 
 def try_parse_date(line):
     try:
-        res = date_expr().parseString(line, parseAll=True)
+        res = date_expr().parseString(line, parseAll=False)
     except pp.ParseException:
         return None
     return datetime.date(int(res.year), int(res.month), int(res.day))
 
 
-@lru_cache()
 def date_expr():
-    num2 = pp.Word(pp.nums, min=2, max=2)
-    num4 = pp.Word(pp.nums, min=4, max=4)
-    date = (
-        num4.setResultsName("year")
+    return (
+        pp.Word(pp.nums).setResultsName("year")
         + "-"
-        + num2.setResultsName("month")
+        + pp.Word(pp.nums).setResultsName("month")
         + "-"
-        + num2.setResultsName("day")
+        + pp.Word(pp.nums).setResultsName("day")
     )
-    return date
 
 
 def is_timeentry(line):
@@ -167,48 +164,44 @@ def try_parse_timeentry(line):
     res = timeentry_expr().parseString(line, parseAll=True)
     return {
         "tags": list(res.tag),
-        "desc": " ".join([d.strip() for d in res.desc]).strip(),
-        "first_time": datetime.time(int(res.start_hour), int(res.start_minute))
-        if res.start_hour
-        else None,
-        "last_time": datetime.time(int(res.end_hour), int(res.end_minute))
-        if res.end_hour
-        else None,
+        "desc": res.desc.strip(),
+        "first_time": parse_time(res.first_time[0]) if res.first_time else None,
+        "last_time": parse_time(res.last_time[0]) if res.last_time else None,
         "hours": int(res.hours) if res.hours else None,
         "minutes": int(res.minutes) if res.minutes else None,
     }
 
 
+TAG_SYMBOLS = pp.alphanums + "_"
+
+
 @lru_cache()
 def timeentry_expr():
-    num2 = pp.Word(pp.nums, exact=2)
     start_time = (
-        num2.setResultsName("start_hour") + ":" + num2.setResultsName("start_minute")
-    )
-    duration_sep = pp.Optional(pp.Word("-"))
-    end_time = num2.setResultsName("end_hour") + ":" + num2.setResultsName("end_minute")
+        pp.Word(pp.nums) + pp.Optional(":" + pp.Word(pp.nums))
+    ).setResultsName('first_time')
+    end_time = (
+        pp.Word(pp.nums) + pp.Optional(":" + pp.Word(pp.nums))
+    ).setResultsName("last_time")
 
     interval_h = pp.Word(pp.nums).setResultsName("hours") + "h"
     interval_m = pp.Word(pp.nums).setResultsName("minutes") + "m"
-    end = pp.Or([interval_h, interval_m, interval_h + interval_m, end_time])
 
-    desc_sep = "|"
-    desc = tags_expr()
+    timepart = pp.Or(
+        (
+            start_time + pp.Char("-") + end_time,
+            pp.Optional(start_time)
+            + pp.Or((interval_h, interval_m, interval_h + interval_m)),
+        )
+    )
+    tagpart = (
+        pp.Optional(pp.CharsNotIn(TAG_SYMBOLS))
+        + pp.Word(TAG_SYMBOLS).setResultsName("tag", listAllMatches=True)
+        + pp.Optional(pp.CharsNotIn(TAG_SYMBOLS))
+    )
+    descpart = pp.SkipTo(pp.lineEnd).setResultsName("desc")
 
-    return pp.Optional(start_time + duration_sep) + end + desc_sep + desc
-
-
-def parse_tags(text):
-    res = tags_expr().parseString(text)
-    return list(res.tag), " ".join(res.desc)
-
-
-@lru_cache()
-def tags_expr():
-    desc = pp.CharsNotIn("[]").setResultsName("desc", True)
-    tag = pp.CharsNotIn("[]").setResultsName("tag", True)
-    res = pp.Optional(desc) + pp.ZeroOrMore("[" + tag + "]" + pp.Optional(desc))
-    return res
+    return timepart + tagpart + descpart
 
 
 if __name__ == "__main__":
