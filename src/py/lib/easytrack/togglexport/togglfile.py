@@ -7,18 +7,26 @@ from typing import List, Optional, Tuple
 import pyparsing as pp
 from easytrack.togglexport.alias_db import Alias, AliasDB
 from easytrack.togglexport.entry import TglStandardEntry
+from easytrack.trackfile import parse_time
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class Togglfile:
-    entries: List[TglStandardEntry]
+    entries_unchecked: List[TglStandardEntry]
     comments: List[Tuple[int, str]]
+    errors: List["ValidationError"]
 
     def get_dates(self):
         dates = {e.start.date() for e in self.entries}
         return sorted(dates)
+
+    @property
+    def entries(self):
+        if self.errors:
+            raise self.errors[0]
+        return self.entries_unchecked
 
 
 class ValidationError(Exception):
@@ -46,7 +54,7 @@ class _TogglfileParser:
         file_date: Optional[datetime.date] = None,
     ):
         self.content = content
-        self.res = Togglfile([], [])
+        self.res = Togglfile([], [], [])
 
         self.file_date = file_date
         self.date = self.file_date
@@ -56,9 +64,13 @@ class _TogglfileParser:
 
     def parse(self):
         for i, line in enumerate(self.content.strip().split("\n"), start=1):
-            line = line.strip()
-            if line:
-                self._parse_line(i, line)
+            try:
+                line = line.strip()
+                if line:
+                    self._parse_line(i, line)
+            except ValidationError as e:
+                log.exception(f'Validation error: {e}')
+                self.res.errors.append(e)
         return self.res
 
     def _parse_time(self, first_time, last_time, hours, minutes, **_):
@@ -91,7 +103,7 @@ class _TogglfileParser:
         alias = self.aliases.get(tags[0])
         if alias is None:
             raise ValidationError(
-                f"Alias {tags[0]} not found. Available aliases: {self.aliases}"
+                f"Alias \"{tags[0]}\" not found. Available aliases: {list(self.aliases)}"
             )
 
         entry = TglStandardEntry(
@@ -102,7 +114,7 @@ class _TogglfileParser:
             task=alias.task,
             description=description,
         )
-        self.res.entries.append(entry)
+        self.res.entries_unchecked.append(entry)
 
     def _parse_line(self, i: int, line: str):
         try:
@@ -111,13 +123,11 @@ class _TogglfileParser:
             date_match = try_parse_date(line)
             if date_match:
                 self.date = date_match
-                self.res.comments.append((i, f"set date to {self.date}"))
+                self.res.comments.append((i, f"Set date to {self.date}"))
                 return
-            time_match = try_parse_timeentry(line)
-            if time_match:
+            if is_timeentry(line):
+                time_match = try_parse_timeentry(line)
                 return self._parse_timeentry_line(time_match)
-            if "|" in line:
-                raise ValidationError('Line has "|" but couldn\'t be parsed')
 
         except ValidationError as e:
             e.line = line
@@ -149,12 +159,12 @@ def date_expr():
     return date
 
 
-def try_parse_timeentry(line):
-    try:
-        res = timeentry_expr().parseString(line, parseAll=True)
-    except pp.ParseException:
-        return None
+def is_timeentry(line):
+    return pp.Char(pp.nums).matches(line, parseAll=False)
 
+
+def try_parse_timeentry(line):
+    res = timeentry_expr().parseString(line, parseAll=True)
     return {
         "tags": list(res.tag),
         "desc": " ".join([d.strip() for d in res.desc]).strip(),
@@ -199,14 +209,6 @@ def tags_expr():
     tag = pp.CharsNotIn("[]").setResultsName("tag", True)
     res = pp.Optional(desc) + pp.ZeroOrMore("[" + tag + "]" + pp.Optional(desc))
     return res
-
-
-def parse_time(t) -> datetime.time:
-    h = int(t[0:2])
-    m = 0
-    if len(t) == 5:
-        m = int(t[3:5])
-    return datetime.time(h, m)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ def run_export(
     aliases = AliasDB(aliasespath).get_aliases()
 
     togglfile = parse_toggl_file(togglpath.read_text(), aliases)
+    if togglfile.errors:
+        raise ValueError('Please check export-statusfile for validation errors.')
 
     localentries = togglfile.entries
     dates = togglfile.get_dates()

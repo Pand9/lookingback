@@ -95,6 +95,8 @@ def time_re():
 
 
 def parse_time(t) -> datetime.time:
+    if isinstance(t, datetime.time):
+        return t
     try:
         return datetime.datetime.strptime(t, '%H').time()
     except ValueError:

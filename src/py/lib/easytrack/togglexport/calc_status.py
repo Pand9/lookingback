@@ -17,29 +17,45 @@ def calc_status(
     togglpath: Path,
     local: bool = False,
 ):
-    tasks = TaskDB(taskcachepath).get_tasks()
-    aliases = AliasDB(aliasespath).get_aliases()
+    def _print(*a, **kw):
+        print(*a, **kw, file=statusfile)
     with statuspath.open("w") as statusfile:
+        curtime = datetime.datetime.now().time()
+
+        _print("# Easytrack export report")
+        _print()
+        _print("Generated:", curtime.isoformat(timespec="seconds"))
+
+        _print()
+        _print("## Problems")
+        _print()
+
+        tasks = TaskDB(taskcachepath).get_tasks()
+        aliases = AliasDB(aliasespath).get_aliases()
         if not tasks:
-            print(
-                'There are no task definitions. Please run "toggl download-tasks"',
-                file=statusfile,
+            _print(
+                '- There are no task definitions. Please run "toggl download-tasks"',
             )
         if not aliases:
-            print(
-                f"There are no aliases. Please open {aliasespath} and define some aliases.",
-                file=statusfile,
+            _print(
+                f"- There are no aliases. Please open {aliasespath} and define some aliases."
             )
         if not tasks or not aliases:
             return
 
         togglfile = parse_toggl_file(togglpath.read_text(), aliases)
 
+        if togglfile.errors:
+            for error in togglfile.errors:
+                _print(f"- {error}")
+        else:
+            _print("There are no problems.")
+
         if not local:
             systementries = toggl_get_entries(togglfile.get_dates(), tasks, aliases)
         else:
             systementries = None
-        localentries = togglfile.entries
+        localentries = togglfile.entries_unchecked
         _do_report(systementries, localentries, statusfile)
 
 
@@ -62,12 +78,6 @@ def _do_report(systementries, localentries, statusfile):
 
     def _print(*a, **kw):
         print(*a, **kw, file=statusfile)
-
-    curtime = datetime.datetime.now().time()
-
-    _print("# Easytrack export report")
-    _print()
-    _print("Generated:", curtime.isoformat(timespec="seconds"))
 
     if localentries is not None:
         _print()
