@@ -49,17 +49,18 @@ def calc_status(
             for error in togglfile.errors:
                 _print(f"- {error}")
         else:
-            _print("There are no problems.")
+            _print("There are no problems")
 
         if not local:
-            systementries = toggl_get_entries(togglfile.get_dates(), tasks, aliases)
+            systementries = toggl_get_entries(togglfile.get_dates_unchecked(), tasks, aliases)
         else:
             systementries = None
         localentries = togglfile.entries_unchecked
-        _do_report(systementries, localentries, statusfile)
+        dates = togglfile.get_dates_unchecked()
+        _do_report(systementries, localentries, dates, statusfile)
 
 
-def _do_report(systementries, localentries, statusfile):
+def _do_report(systementries, localentries, dates, statusfile):
     if systementries is not None:
         systementries = sorted(e.normalize() for e in systementries)
     if localentries is not None:
@@ -100,6 +101,12 @@ def _do_report(systementries, localentries, statusfile):
                 _print(entry)
         else:
             _print("No such entries")
+    elif dates is not None:
+        _print()
+        _print("## Full list of dates that would be deleted")
+        _print()
+        for date in dates:
+            _print(f'- {date.isoformat()}')
 
     if systementries is not None and localentries is not None:
         _print()

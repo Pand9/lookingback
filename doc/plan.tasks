@@ -1,5 +1,5 @@
 edge cases & error handling:
-- put fileformat errors within .status file
+✔ put fileformat errors within .status file @done(21-05-14 21:22)
     ✔ trackfile @done(21-05-14 18:56)
     ✔ togglfile @done(21-05-14 19:39)
 ✔ don't parse any files just to open a workspace @done(21-05-11 11:01)
@@ -18,15 +18,15 @@ togglexport:
 ✔ cache clients, projects & tasks @done(21-04-29 14:45)
 ✔ let user define human friendly names of toggl projects & tasks @done(21-04-29 14:45)
 ✔ implement cli workflow with dry-run phase @done(21-04-29 14:46)
-- show deleted entries in summary
-- show validation errors in summary
-- relax syntax to support simple "8h dev core-dev work"
-- support deleting (exporting empty set)
-- support standalone togglexport workspace
+✔ show deleted entries in summary @done(21-05-14 22:41)
+✔ show validation errors in summary @done(21-05-14 21:23)
+✔ relax syntax to support simple "8h dev core-dev work" @done(21-05-14 21:22)
+✔ support deleting (exporting empty set) @done(21-05-14 22:41)
+✔ support standalone togglexport workspace @done(21-05-14 21:22)
 - document syntax
 - support different toggl accounts
 - safe store for credentials
-- batch toggl
+✔ batch toggl @done(21-05-14 22:41)
 
 
 easyaccess journal:
