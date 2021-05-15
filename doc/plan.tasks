@@ -24,8 +24,8 @@ togglexport:
 ✔ support deleting (exporting empty set) @done(21-05-14 22:41)
 ✔ support standalone togglexport workspace @done(21-05-14 21:22)
 - document syntax
-- support different toggl accounts
-- safe store for credentials
+✔ support different toggl accounts @done(21-05-15 12:15)
+- safe store for credentials (document it)
 ✔ batch toggl @done(21-05-14 22:41)
 
 
@@ -41,8 +41,8 @@ easyaccess journal:
 - run report since last date
 ✔ document note format
 - document directory structure
-- when moving an empty file to .finished, delete it instead
-- batch finish old files
+✔ when moving an empty file to .finished, delete it instead @done(21-05-15 12:44)
+✔ batch finish old files @done(21-05-15 12:44)
 
 
 easyaccess monitors:

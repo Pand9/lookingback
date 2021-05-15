@@ -214,7 +214,7 @@ def workdir_setup(conf: Conf, input_args):
         workdir_name = cmd
 
     try:
-        workdir_path = conf.track_dir / "workdir" / workdir_name
+        workdir_path = conf.track_dir / "logs" / workdir_name
         workdir_path.mkdir(parents=True, exist_ok=True)
         with spinlock(workdir_path / "lock"):
             logging_setup(input_args, workdir_path)
@@ -361,8 +361,8 @@ def setup_reporter_parser(parser):
 def setup_vacuum_parser(vacuum):
     setup_common(vacuum)
     vacuum.add_argument("verb", choices=["delete", "archive"])
-    vacuum.add_argument("desc", choices=["all", "old"])
-    vacuum.add_argument("advs", nargs="*", choices=["monits", "logs"])
+    vacuum.add_argument("desc", choices=["all", "old", "empty"])
+    vacuum.add_argument("advs", nargs="*", choices=["monits", "logs", "trackfiles"])
     vacuum.add_argument("--dry-run", action="store_true")
 
 

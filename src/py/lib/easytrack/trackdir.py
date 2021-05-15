@@ -60,7 +60,6 @@ class TrackdirToggl(TrackdirStateBeforeValidation):
             self.exporting_file(),
             self.exportstatus_file(),
             self.toggl_aliases_path(),
-            conf.conf_path,
         ]
 
 
