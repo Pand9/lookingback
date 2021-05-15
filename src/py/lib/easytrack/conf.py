@@ -5,7 +5,6 @@ import os
 
 
 DEFAULT_BODY = '''
-track_dir = '~/workdir/trackdir'
 softlimit = 30
 hardlimit = 120
 '''.lstrip()
@@ -19,20 +18,23 @@ class Conf:
     hardlimit: int
 
 
-def validate_conf(conf_path: Path, conf) -> Conf:
+def validate_conf(conf_path: Path, track_dir: Path, conf) -> Conf:
     return Conf(
         conf_path=conf_path,
-        track_dir=Path(os.path.expanduser(conf["track_dir"])),
+        track_dir=track_dir,
         softlimit=int(conf["softlimit"]),
         hardlimit=int(conf["hardlimit"]),
     )
 
 
 def load_conf() -> Conf:
-    conf_path = Path(os.getenv('EASYTRACK_TRACK_DIR')) / 'config.toml'
-    conf_path = conf_path.expanduser()
+    track_dir = os.getenv('EASYTRACK_TRACK_DIR')
+    if not track_dir:
+        raise ValueError('Please set $EASYTRACK_TRACK_DIR')
+    track_dir = Path(track_dir).expanduser()
+    conf_path = track_dir / 'config.toml'
     if not conf_path.exists():
         conf_path.write_text(DEFAULT_BODY)
     conf = toml.load(str(conf_path))
-    conf = validate_conf(Path(conf_path), conf)
+    conf = validate_conf(conf_path=conf_path, track_dir=track_dir, conf=conf)
     return conf
