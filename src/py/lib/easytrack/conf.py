@@ -4,6 +4,13 @@ from pathlib import Path
 import os
 
 
+DEFAULT_BODY = '''
+track_dir = '~/workdir/trackdir'
+softlimit = 30
+hardlimit = 120
+'''.lstrip()
+
+
 @dataclass(frozen=True, eq=True)
 class Conf:
     conf_path: Path
@@ -22,8 +29,10 @@ def validate_conf(conf_path: Path, conf) -> Conf:
 
 
 def load_conf() -> Conf:
-    conf_path = "~/.config/easytrack/config.toml"
-    conf_path = os.path.expanduser(conf_path)
-    conf = toml.load(conf_path)
+    conf_path = Path(os.getenv('EASYTRACK_TRACK_DIR')) / 'config.toml'
+    conf_path = conf_path.expanduser()
+    if not conf_path.exists():
+        conf_path.write_text(DEFAULT_BODY)
+    conf = toml.load(str(conf_path))
     conf = validate_conf(Path(conf_path), conf)
     return conf
