@@ -35,7 +35,7 @@ def open_trackdir(conf: Conf, dir_cls: Union[TrackdirToggl, TrackdirTrackfiles])
         [
             "code",
             conf.track_dir,
-            *dir_cls.init_novalidate(conf).paths_to_open(conf),
+            *dir_cls(conf).paths_to_open(conf),
         ],
         stdout=PIPE,
         stderr=PIPE,
@@ -44,13 +44,16 @@ def open_trackdir(conf: Conf, dir_cls: Union[TrackdirToggl, TrackdirTrackfiles])
 
 
 def common_routine(conf: Conf):
-    trackdir = TrackdirTrackfiles.init(conf)
+    trackdir = TrackdirTrackfiles(conf)
+    trackdir.parse()
     if trackdir.actives:
         duration = trackdir.actives[0].duration_from_lasttime()
         if duration is not None:
-            if duration.seconds // 60 >= conf.hardlimit:
+            minutes = duration.days * 1440 + duration.seconds // 60
+            log.debug('duration since lasttime:%d minutes', minutes)
+            if minutes >= conf.hardlimit:
                 _send_reminder(duration, critical=True)
-            elif duration.seconds // 60 >= conf.softlimit:
+            elif minutes >= conf.softlimit:
                 _send_reminder(duration, critical=False)
 
     log.debug("conf: %s", repr(conf))
@@ -62,7 +65,8 @@ def common_routine(conf: Conf):
 
 
 def toggl_status(conf: Conf, local: bool = False):
-    trackdir = TrackdirToggl.init(conf)
+    trackdir = TrackdirToggl(conf)
+    trackdir.parse()
     calc_status(
         trackdir.toggl_taskcache_path(),
         trackdir.toggl_aliases_path(),
@@ -73,7 +77,8 @@ def toggl_status(conf: Conf, local: bool = False):
 
 
 def toggl_export(conf: Conf):
-    trackdir = TrackdirToggl.init(conf)
+    trackdir = TrackdirToggl(conf)
+    trackdir.parse()
     run_export(
         trackdir.toggl_taskcache_path(),
         trackdir.toggl_aliases_path(),
@@ -84,7 +89,7 @@ def toggl_export(conf: Conf):
 
 
 def toggl_download_tasks(conf: Conf):
-    TrackdirToggl.init(conf).download_tasks()
+    TrackdirToggl(conf).parse().download_tasks()
 
 
 def ensure_rust_bin() -> Tuple[List[str], str]:

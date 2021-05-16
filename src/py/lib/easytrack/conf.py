@@ -17,6 +17,13 @@ class Conf:
     softlimit: int
     hardlimit: int
 
+    @classmethod
+    def global_bash_scripts_dir(cls):
+        res = os.getenv('EASYTRACK_BASH_SOURCE_PATH')
+        if not res:
+            raise ValueError('Please set $EASYTRACK_BASH_SOURCE_PATH')
+        return res
+
 
 def validate_conf(conf_path: Path, track_dir: Path, conf) -> Conf:
     return Conf(

@@ -27,6 +27,7 @@ togglexport:
 ✔ support different toggl accounts @done(21-05-15 12:15)
 - safe store for credentials (document it)
 ✔ batch toggl @done(21-05-14 22:41)
+✔ bootstrap vscode tasks @done(21-05-16 15:07)
 
 
 easyaccess journal:
@@ -34,7 +35,7 @@ easyaccess journal:
 ✔ sort files based on `FINISHED`, `EXPORTED` tags
 ✔ add cli command to open in vscode
 ✔ report info about last note time within .status file
-- support adding time in the short future
+✔ support adding time in the short future @done(21-05-15 17:25)
 ✔ notify of notes getting out of date
 ✔ autoopen one recent file in vscode
 ✔ autoopen two recent files @done(21-05-11 11:02)

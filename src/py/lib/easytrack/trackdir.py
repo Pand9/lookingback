@@ -1,5 +1,6 @@
 import logging
 import os
+import string
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -7,6 +8,7 @@ from typing import List
 from easytrack.conf import Conf
 from easytrack.time import now, today
 from easytrack.togglexport.task_db import TaskDB
+from easytrack.trackdir_templates import TASKS_JSON_TEXT
 from easytrack.trackfile import Trackfile, TrackfileState
 
 log = logging.getLogger(__name__)
@@ -21,6 +23,24 @@ class TrackdirStateBeforeValidation:
 
     def paths_to_open(self, conf: Conf):
         return [conf.conf_path]
+
+    def __init__(self, conf: Conf, vscode_tasks: bool = True, overwrite: bool = False):
+        self.dirpath = conf.track_dir
+
+        if vscode_tasks:
+            self.init_vscode_tasks(conf, overwrite=overwrite)
+
+    @classmethod
+    def init_vscode_tasks(cls, conf: Conf, overwrite: bool):
+        f = Path(conf.track_dir) / ".vscode" / "tasks.json"
+        if f.exists() and not overwrite:
+            return
+        f.write_text(
+            string.Template(TASKS_JSON_TEXT).substitute(
+                {"EASYTRACK_BASH_SOURCE_PATH": Conf.global_bash_scripts_dir()}
+            )
+        )
+        log.info("Initialized vscode tasks")
 
 
 @dataclass
@@ -37,20 +57,14 @@ class TrackdirToggl(TrackdirStateBeforeValidation):
     def exporting_file(self) -> Path:
         return self.activedir() / "export_input.easyexport"
 
-    @classmethod
-    def init_novalidate(cls, conf: Conf) -> "TrackdirToggl":
-        return cls(dirpath=conf.track_dir)
+    def parse(self) -> "TrackdirToggl":
+        self.activedir().mkdir(exist_ok=True)
 
-    @classmethod
-    def init(cls, conf: Conf) -> "TrackdirToggl":
-        state = TrackdirToggl(dirpath=conf.track_dir)
-        state.activedir().mkdir(exist_ok=True)
-
-        for p in state.exportstatus_file(), state.exporting_file():
+        for p in self.exportstatus_file(), self.exporting_file():
             if not p.exists():
                 p.open("w").close()
 
-        return state
+        return self
 
     def download_tasks(self):
         TaskDB(self.toggl_taskcache_path()).cache_refresh()
@@ -92,20 +106,17 @@ class TrackdirTrackfiles(TrackdirStateBeforeValidation):
     def toggl_aliases_path(self) -> Path:
         return self.dirpath / "toggl_aliases.json"
 
-    @classmethod
-    def init_novalidate(cls, conf: Conf) -> "TrackdirTrackfiles":
-        state = TrackdirTrackfiles(conf.track_dir, actives=[])
-        state.activedir().mkdir(exist_ok=True)
-        with state.today_trackfile_path().open("a"):
+    def __init__(self, conf: Conf):
+        super().__init__(conf)
+        self.actives = None
+        self.activedir().mkdir(exist_ok=True)
+        with self.today_trackfile_path().open("a"):
             log.debug("ensure .today.easytrack")
-        return state
 
-    @classmethod
-    def init(cls, conf: Conf) -> "TrackdirTrackfiles":
-        state = cls.init_novalidate(conf)
-        active_dir = state.activedir()
-        finished_dir = conf.track_dir / "finished"
-        exported_dir = conf.track_dir / "exported"
+    def parse(self) -> "TrackdirTrackfiles":
+        active_dir = self.activedir()
+        finished_dir = self.dirpath / "finished"
+        exported_dir = self.dirpath / "exported"
         for d in active_dir, finished_dir, exported_dir:
             d.mkdir(exist_ok=True)
 
@@ -121,7 +132,7 @@ class TrackdirTrackfiles(TrackdirStateBeforeValidation):
             if f.state.exported:
                 rename(p, "exported")
 
-        with state.today_trackfile_path().open("a"):
+        with self.today_trackfile_path().open("a"):
             log.debug("ensure .today.easytrack")
 
         for p in active_dir.iterdir():
@@ -146,7 +157,8 @@ class TrackdirTrackfiles(TrackdirStateBeforeValidation):
                 active_trackfiles.append(f)
 
         active_trackfiles.sort(key=lambda f: f.day, reverse=True)
-        return TrackdirTrackfiles(dirpath=state.dirpath, actives=active_trackfiles)
+        self.actives = active_trackfiles
+        return self
 
     def paths_to_open(self, conf: Conf):
         if self.actives:

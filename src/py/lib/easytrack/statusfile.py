@@ -25,7 +25,7 @@ def rewrite_statusfile(conf: Conf, trackdir: TrackdirTrackfiles):
             _print(
                 f"Active trackfiles: {', '.join([_str_date(f.day) for f in actives])}",
             )
-            lasttime = actives[0].active_lasttime
+            lasttime = actives[0].last_datetime
             d = actives[0].duration_from_lasttime()
             if d is not None:
                 _print(
@@ -43,6 +43,11 @@ def rewrite_statusfile(conf: Conf, trackdir: TrackdirTrackfiles):
                         _print(f'- File {_str_date(active.day)}')
                         for error in active.errors:
                             _print(f'    - Line {error.i}: {error.msg}')
+            else:
+                _print()
+                _print('## File format errors')
+                _print()
+                _print('- No errors')
 
         _print()
         _print("## Guide to the trackfile format")

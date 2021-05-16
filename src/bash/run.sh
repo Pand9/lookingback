@@ -8,7 +8,7 @@ HELP_PREFIX=$(cat <<-END
 # - $EASYTRACK_ALERT_METHOD - if "stdout" (default), alerts are not sent other than stdout; suitable for CLI. if "notify-send" provided, notify-send alerts are issued.
 # - $EASYTRACK_LOG_OUTPUT - either "stderr" (default), or "file"
 # - $EASYTRACK_PYTHON_VENV_ACTIVATE - python venv (optional, system python3 used otherwise)
-# - $EASYTRACK_SH_SOURCE_PATH - defaults to $(dirname $0)/../sh
+# - $EASYTRACK_BASH_SOURCE_PATH - defaults to $(dirname $0)/../sh
 # - $EASYTRACK_PY_SOURCE_PATH - defaults to $(dirname $0)/../py
 # - $EASYTRACK_RUST_SOURCE_PATH - used only when EASYTRACK_RUST_REDUCER_BIN_PATH not provided. Defaults to $(dirname $0)/../rust
 # - $EASYTRACK_RUST_REDUCER_BIN_PATH - If not provided, rust binary is ran with cargo build --release in $EASYTRACK_RUST_SOURCE_PATH
@@ -60,7 +60,7 @@ alert() {
 
 if is_help; then echo "$HELP_PREFIX"; fi
 
-variables=(EASYTRACK_ALERT_METHOD EASYTRACK_LOG_OUTPUT EASYTRACK_PYTHON_VENV_ACTIVATE EASYTRACK_SH_SOURCE_PATH EASYTRACK_PY_SOURCE_PATH EASYTRACK_RUST_SOURCE_PATH EASYTRACK_RUST_REDUCER_BIN_PATH EASYTRACK_RUST_CARGO_RUN_ARGS EASYTRACK_TRACK_DIR)
+variables=(EASYTRACK_ALERT_METHOD EASYTRACK_LOG_OUTPUT EASYTRACK_PYTHON_VENV_ACTIVATE EASYTRACK_BASH_SOURCE_PATH EASYTRACK_PY_SOURCE_PATH EASYTRACK_RUST_SOURCE_PATH EASYTRACK_RUST_REDUCER_BIN_PATH EASYTRACK_RUST_CARGO_RUN_ARGS EASYTRACK_TRACK_DIR)
 
 print_variables () {
     local p
@@ -80,12 +80,12 @@ if [[ "$EASYTRACK_ALERT_METHOD" != stdout && "$EASYTRACK_ALERT_METHOD" != notify
     exit 1
 fi
 export EASYTRACK_LOG_OUTPUT=${EASYTRACK_LOG_OUTPUT:-stderr}
-EASYTRACK_SH_SOURCE_PATH=${EASYTRACK_SH_SOURCE_PATH:-$(dirname $0)}
+export EASYTRACK_BASH_SOURCE_PATH=$(dirname $0)
 EASYTRACK_PY_SOURCE_PATH=${EASYTRACK_PY_SOURCE_PATH:-$(dirname $0)/../py}
 if ! [[ $EASYTRACK_RUST_REDUCER_BIN_PATH ]]; then
     export EASYTRACK_RUST_SOURCE_PATH=${EASYTRACK_RUST_SOURCE_PATH:-$(dirname $0)/../rust}
 else
-    export
+    export EASYTRACK_RUST_REDUCER_BIN_PATH
 fi
 EASYTRACK_RUST_CARGO_RUN_ARGS=${EASYTRACK_RUST_CARGO_RUN_ARGS:-"--release"}
 
@@ -101,7 +101,7 @@ fi
 export PYTHONPATH="$PYTHONPATH:$EASYTRACK_PY_SOURCE_PATH/lib"
 if is_verbose; then >&2 echo "updated PYTHONPATH: $PYTHONPATH"; fi
 
-python3 "$(dirname $0)/../py/run.py" $@
+python3 "$EASYTRACK_PY_SOURCE_PATH/run.py" $@
 code=$?
 if is_verbose; then >&2 echo "python return code: $code"; fi
 if [[ $code != 0 && $code != 42 ]]; then
