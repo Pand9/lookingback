@@ -218,8 +218,8 @@ def timeentry_expr():
         pp.Word(pp.nums) + pp.Optional(":" + pp.Word(pp.nums))
     ).setResultsName("last_time")
 
-    interval_h = pp.Word(pp.nums).setResultsName("hours") + "h"
-    interval_m = pp.Word(pp.nums).setResultsName("minutes") + "m"
+    interval_h = pp.Word(pp.nums).setResultsName("hours") + pp.Char("h")
+    interval_m = pp.Word(pp.nums).setResultsName("minutes") + pp.Char("m")
 
     timepart = pp.Or([
         start_time + pp.Char("-") + end_time,

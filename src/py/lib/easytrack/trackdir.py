@@ -45,6 +45,9 @@ class TrackdirStateBeforeValidation:
 
 @dataclass
 class TrackdirToggl(TrackdirStateBeforeValidation):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def toggl_taskcache_path(self) -> Path:
         return self.dirpath / "toggl_task_cache.json"
 

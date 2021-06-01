@@ -46,7 +46,9 @@ class ValidationError(Exception):
 class Trackfile:
     def __init__(self, p: str):
         self.state = TrackfileState(p, parse_filename(p), None, False, False, [])
-        self.last_datetime = datetime.datetime.combine(self.state.day, datetime.time())
+        self.last_datetime = None
+        # self.last_datetime = datetime.datetime.combine(self.state.day, datetime.time())
+        # TODO express state of unstarted file that isn't tracking yet
         with open(p) as f:
             for i, line in enumerate(f, start=1):
                 self.parse(i, line)
@@ -74,9 +76,10 @@ class Trackfile:
                     time = parse_time(time_str)
                 except ValueError:
                     raise ValidationError(f'Couldn\'t parse time "{time_str}"')
-                dtt = datetime.datetime.combine(self.last_datetime.date(), time)
-                if dtt < self.last_datetime:
-                    if self.last_datetime - dtt <= datetime.timedelta(hours=12):
+                last_dtt = self.last_datetime or datetime.datetime.combine(self.state.day, datetime.time())
+                dtt = datetime.datetime.combine(last_dtt.date(), time)
+                if dtt < last_dtt:
+                    if last_dtt - dtt <= datetime.timedelta(hours=12):
                         raise ValidationError(
                             f"Unordered lines: {self.last_datetime.time()} and {time}"
                         )
