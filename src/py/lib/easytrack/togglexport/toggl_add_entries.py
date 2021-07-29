@@ -1,5 +1,6 @@
 import os
 import urllib.error
+import time
 from typing import List
 
 from easytrack.togglexport.entry import TglStandardEntry
@@ -64,6 +65,7 @@ def toggl_add_entries(
     for i, togglentry in enumerate(togglentries, start=1):
         try:
             try:
+                time.sleep(0.1)
                 resp = toggl.postRequest(
                     Endpoints.TIME_ENTRIES, {"time_entry": togglentry}
                 )
