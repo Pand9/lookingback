@@ -223,31 +223,32 @@ def timeentry_expr():
 
     timepart = pp.Or([
         start_time + pp.Char("-") + end_time,
-        pp.Optional(start_time) + pp.Or([
+        pp.Or([
             interval_h,
             interval_m,
             interval_h + interval_m
         ])
-    ]
-    )
+    ])
+    timeseppart = pp.Optional(pp.Char('|:-'))
     tagpart = (
-        pp.Optional(pp.CharsNotIn(TAG_SYMBOLS))
-        + pp.Word(TAG_SYMBOLS).setResultsName("tag", listAllMatches=True)
-        + pp.Optional(pp.CharsNotIn(TAG_SYMBOLS))
+        pp.Char('[')
+        + pp.CharsNotIn('[]').setResultsName("tag", listAllMatches=True)
+        + pp.Char(']')
     )
     descpart = pp.SkipTo(pp.lineEnd).setResultsName("desc")
 
-    return timepart + tagpart + descpart
+    return timepart + timeseppart + pp.OneOrMore(tagpart) + descpart
     # fmt:on
 
 
 if __name__ == "__main__":
     content = """
 2021-04-02
-11:00 5h 15m | [dev] dfa
+11:00 - 15:00 | [dev] dfa
 20m | [dev] ggh
 2021-03-03
-3h | ggh [planning]
+3h |[planning] ggh
+11 - 13 |[planning] ggh
     """
     db = AliasDB("/home/ks/workdir/trackdir/toggl_aliases.json")
     aliases = db.get_aliases()
