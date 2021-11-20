@@ -243,7 +243,7 @@ def timeentry_expr():
 
 if __name__ == "__main__":
     content = """
-2021-04-02
+2021-04-02 - 2021-04-05
 11:00 - 15:00 | [dev] dfa
 20m | [dev] ggh
 2021-03-03

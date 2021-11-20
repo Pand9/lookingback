@@ -1,5 +1,6 @@
 import datetime
 import os
+import time
 from typing import List
 
 from easytrack.togglexport.alias_db import Alias
@@ -37,6 +38,8 @@ def toggl_get_entries_raw(date: datetime.date, token=None):
         start_date + datetime.timedelta(days=1) + datetime.timedelta(minutes=-1)
     ).isoformat()
 
+    print(date)
+    time.sleep(2)
     togglentries = toggl.request(Endpoints.TIME_ENTRIES, params)
     return togglentries
 
