@@ -39,6 +39,7 @@ def load_conf() -> Conf:
     if not track_dir:
         raise ValueError('Please set $EASYTRACK_TRACK_DIR')
     track_dir = Path(track_dir).expanduser()
+    track_dir.mkdir(exist_ok=True)
     conf_path = track_dir / 'config.toml'
     if not conf_path.exists():
         conf_path.write_text(DEFAULT_BODY)

@@ -64,6 +64,17 @@ easyaccess reporter:
 
 runtime environment:
 ✔ document dependencies @done(21-05-11 11:03)
+- document python dependencies and version
+    - python-dateutil
+    - toml
+    - togglpy
+    - pyparsing
+    - 3.8
+- monitor tools
+    - xprintidle
+    - xdotool
+- reporter
+    - rustup
 - provide bootstrap scripts for setting up screens
 
 

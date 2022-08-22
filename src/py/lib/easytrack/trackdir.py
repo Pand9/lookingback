@@ -32,7 +32,9 @@ class TrackdirStateBeforeValidation:
 
     @classmethod
     def init_vscode_tasks(cls, conf: Conf, overwrite: bool):
-        f = Path(conf.track_dir) / ".vscode" / "tasks.json"
+        f = Path(conf.track_dir) / ".vscode"
+        f.mkdir(exist_ok=True)
+        f = f / "tasks.json"
         if f.exists() and not overwrite:
             return
         f.write_text(
