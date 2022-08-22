@@ -13,83 +13,26 @@ import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from subprocess import PIPE
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 import dateutil.parser
 from easytrack.conf import Conf, load_conf
 from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
 from easytrack.reporter import print_basic_format, transform_report
-from easytrack.statusfile import rewrite_statusfile
-from easytrack.togglexport.calc_status import calc_status
-from easytrack.togglexport.run_export import run_export
-from easytrack.trackdir import TrackdirToggl, TrackdirTrackfiles
+from easytrack.time import now
+from easytrack.trackdir import TrackdirTrackfiles
 from easytrack.vacuum import do_vacuum
 
 log = logging.getLogger(__name__)
 
 
-def open_trackdir(conf: Conf, dir_cls: Union[TrackdirToggl, TrackdirTrackfiles]):
-    subprocess.run(
-        [
-            "code",
-            conf.track_dir,
-            *dir_cls(conf).paths_to_open(conf),
-        ],
-        stdout=PIPE,
-        stderr=PIPE,
-        check=True,
-    )
-
-
 def common_routine(conf: Conf):
     trackdir = TrackdirTrackfiles(conf)
     trackdir.parse()
-    if trackdir.actives:
-        duration = trackdir.actives[0].duration_from_lasttime()
-        if duration is not None:
-            minutes = duration.days * 1440 + duration.seconds // 60
-            log.debug('duration since lasttime:%d minutes', minutes)
-            if minutes >= conf.hardlimit:
-                _send_reminder(duration, critical=True)
-            elif minutes >= conf.softlimit:
-                _send_reminder(duration, critical=False)
-
     log.debug("conf: %s", repr(conf))
     log.debug("trackdir: %s", repr(trackdir))
-
-    rewrite_statusfile(conf, trackdir)
-
     return trackdir
-
-
-def toggl_status(conf: Conf, local: bool = False):
-    trackdir = TrackdirToggl(conf)
-    trackdir.parse()
-    calc_status(
-        trackdir.toggl_taskcache_path(),
-        trackdir.toggl_aliases_path(),
-        trackdir.exportstatus_file(),
-        trackdir.exporting_file(),
-        local=local,
-    )
-
-
-def toggl_export(conf: Conf):
-    trackdir = TrackdirToggl(conf)
-    trackdir.parse()
-    run_export(
-        trackdir.toggl_taskcache_path(),
-        trackdir.toggl_aliases_path(),
-        trackdir.exportstatus_file(),
-        trackdir.exporting_file(),
-    )
-    toggl_status(conf)
-
-
-def toggl_download_tasks(conf: Conf):
-    TrackdirToggl(conf).parse().download_tasks()
 
 
 def ensure_rust_bin() -> Tuple[List[str], str]:
@@ -114,9 +57,9 @@ def reporter_report(conf: Conf, input_args):
     argv = [
         *rust_bin,
         "--from",
-        serialize_arg_fromto(input_args.from_),
+        mk_str_fromto(input_args.from_),
         "--to",
-        serialize_arg_fromto(input_args.to),
+        mk_str_fromto(input_args.to),
         "--chunk-minutes",
         str(input_args.chunk_minutes),
         "--chunk-colors",
@@ -163,130 +106,63 @@ def _run_monitor(conf: Conf, ticks: int):
     monitor_state.run_monitor()
 
 
-def _send_reminder(duration, critical=False):
-    duration_minutes = duration.seconds // 60
-    msg = f"Elapsed {duration_minutes} minutes since last time entry"
-    alert_method = os.getenv("EASYTRACK_ALERT_METHOD")
-    if alert_method == "notify-send":
-        cmd = ["notify-send"]
-        if critical:
-            cmd += ["--urgency=critical"]
-        cmd += ["--app-name=easytrack", "Remember to track time", msg]
-        log.info('running "%s"', shlex.join(cmd))
-        subprocess.run(cmd, stdout=PIPE, stderr=PIPE, check=True)
-    elif alert_method == os.getenv("EASYTRACK_ALERT_METHOD") == "stdout":
-        print(
-            json.dumps(
-                {
-                    "type": "alert",
-                    "msg": msg,
-                    "duration_minutes": duration_minutes,
-                    **({"is_critical": True} if critical else {}),
-                }
-            )
-        )
-    else:
-        raise ValueError(f"unknown EASYTRACK_ALERT_METHOD value {alert_method}")
-
-
 @contextmanager
-def spinlock(lock_path: Path):
-    lock_file = lock_path.open("w")
-    while True:
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            break
-        except OSError as e:
-            if e.errno == errno.EAGAIN:
-                print("file locked; trying again in 1s", file=sys.stderr)
-                time.sleep(1)
-            else:
-                raise
-    yield
-    fcntl.flock(lock_file, fcntl.LOCK_UN)
-    lock_file.close()
-
-
-@contextmanager
-def workdir_setup(conf: Conf, input_args):
-    cmd = input_args.cmd
-    if cmd == "config":
-        yield
-        return
-    elif cmd in ("trackdir", "remind", "vacuum"):
-        workdir_name = "trackdir"
-    else:
-        workdir_name = cmd
-
+def do_lock(lock_path: Path):
     try:
-        workdir_path = conf.track_dir / "logs" / workdir_name
+        lock_file = lock_path.open("w")
+        while True:
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as e:
+                if e.errno == errno.EAGAIN:
+                    print(lock_path, "locked; trying again in 0.1s", file=sys.stderr)
+                    time.sleep(0.1)
+                else:
+                    raise
+        yield
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+@contextmanager
+def cmddir_lock(conf: Conf, input_args):
+    try:
+        workdir_path = conf.track_dir / input_args.cmd
         workdir_path.mkdir(parents=True, exist_ok=True)
-        with spinlock(workdir_path / "lock"):
-            logging_setup(input_args, workdir_path)
-            yield
+        with do_lock(workdir_path / "lock"):
+            yield workdir_path
     except OSError as e:
         raise Exception(f"Locking error for {workdir_path}") from e
-
-
-def logging_setup(input_args, workdir_path: Path):
-    log_level = "INFO" if not input_args.verbose else "DEBUG"
-    log_variant = os.getenv("EASYTRACK_LOG_OUTPUT")
-    logging.basicConfig(
-        format="%(asctime)s.%(msecs)03d|%(levelname).1s|%(lineno)3d| %(message)s",
-        datefmt="%F_%T",
-        level=log_level,
-    )
-    if log_variant == "file":
-        filename = workdir_path / f"{datetime.date.today()}.log"
-        handler = logging.FileHandler(str(filename))
-        handler.setLevel("INFO")
-        logging.getLogger().addHandler(handler)
-
-    logging.info(f'Running "{shlex.join(sys.argv)}"')
 
 
 def run_cli():
     conf = load_conf()
 
-    parser = setup_common(
-        argparse.ArgumentParser(description="Run different easytrack components")
-    )
+    parser = setup_common(argparse.ArgumentParser(description="Run different easytrack components"))
     subparsers = parser.add_subparsers(dest="cmd", required=True)
-    setup_trackdir_parser(subparsers.add_parser("trackdir"))
     setup_common(subparsers.add_parser("config"))
-    setup_common(subparsers.add_parser("remind"))
     setup_monitor_parser(subparsers.add_parser("monitor"))
-    setup_toggl_parser(subparsers.add_parser("toggl"))
-    setup_reporter_parser(subparsers.add_parser("reporter"))
+    setup_report_parser(subparsers.add_parser("report"))
     setup_vacuum_parser(subparsers.add_parser("vacuum", help="clean old data"))
 
     args = parser.parse_args()
 
-    with workdir_setup(conf, args):
-        if args.cmd == "trackdir":
-            if args.trackdir_cmd == "prep":
-                common_routine(conf)
-                logging.info("Finished prepping the trackdir")
-            elif args.trackdir_cmd == "open":
-                open_trackdir(conf, TrackdirTrackfiles)
-        elif args.cmd == "config":
+    with cmddir_lock(conf, args) as cmddir_path:
+        logging.basicConfig(
+            format="%(asctime)s.%(msecs)03d|%(levelname).1s|%(lineno)3d| %(message)s",
+            datefmt="%F_%T",
+            level="INFO" if not args.verbose else "DEBUG",
+        )
+        logging.getLogger().addHandler(
+            logging.FileHandler(str(cmddir_path / f"{datetime.date.today()}.log"), log_level="INFO")
+        )
+        if args.cmd == "config":
             print(to_json(conf))
-        elif args.cmd == "remind":
-            common_routine(conf)
         elif args.cmd == "monitor":
             _run_monitor(conf, args.ticks)
-        elif args.cmd == "toggl":
-            if args.toggl_cmd == "download-tasks":
-                toggl_download_tasks(conf)
-            elif args.toggl_cmd == "status":
-                toggl_status(conf, args.local)
-            elif args.toggl_cmd == "export":
-                toggl_export(conf)
-            elif args.toggl_cmd == "open":
-                open_trackdir(conf, TrackdirToggl)
-        elif args.cmd == "reporter":
-            if args.reporter_cmd == "report":
-                reporter_report(conf, args)
+        elif args.cmd == "report":
+            reporter_report(conf, args)
         elif args.cmd == "vacuum":
             do_vacuum(
                 conf,
@@ -297,77 +173,44 @@ def run_cli():
             )
 
 
-def setup_trackdir_parser(parser):
-    setup_common(parser)
-    subparsers = parser.add_subparsers(dest="trackdir_cmd", required=True)
-    _ = setup_common(subparsers.add_parser("prep"))
-    _ = setup_common(subparsers.add_parser("open"))
-
-
 def setup_monitor_parser(parser):
     setup_common(parser)
-    parser.add_argument(
-        "--ticks", default=60, type=int, help="how many monitor ticks per a process run"
-    )
+    parser.add_argument("--ticks", default=60, type=int, help="how many monitor ticks per a process run")
 
 
-def setup_toggl_parser(parser):
+def setup_report_parser(parser):
     setup_common(parser)
-    subparsers = parser.add_subparsers(dest="toggl_cmd", required=True)
-    _ = subparsers.add_parser("download-tasks")
-    validate = setup_common(subparsers.add_parser("status"))
-    validate.add_argument("--local", action="store_true")
-    _ = subparsers.add_parser("export")
-    _ = subparsers.add_parser("open")
-
-
-def setup_reporter_parser(parser):
-    setup_common(parser)
-    subparsers = parser.add_subparsers(dest="reporter_cmd", required=True)
-    report = setup_common(
-        subparsers.add_parser(
-            "report", formatter_class=argparse.ArgumentDefaultsHelpFormatter
-        )
-    )
-    default_to = parse_arg_fromto(
-        serialize_arg_fromto(datetime.datetime.now())
-    ).replace(tzinfo=None)
+    default_to = parse_arg_fromto(mk_str_fromto(now())).replace(tzinfo=None)
     default_from = parse_arg_fromto(default_to.date().isoformat()).replace(tzinfo=None)
-    report.add_argument(
+    parser.add_argument(
         "--from",
         type=parse_arg_fromto,
         dest="from_",
         default=default_from,
         help="left bound",
     )
-    report.add_argument(
-        "--to", type=parse_arg_fromto, default=default_to, help="right bound"
-    )
-    report.add_argument(
-        "--chunk-minutes", type=int, default=0, help="minutes per a single aggregate"
-    )
-    report.add_argument(
+    parser.add_argument("--to", type=parse_arg_fromto, default=default_to, help="right bound")
+    parser.add_argument("--chunk-minutes", type=int, default=0, help="minutes per a single aggregate")
+    parser.add_argument(
         "--chunk-colors",
         type=int,
         default=0,
         help="top x categories in a single aggregate",
     )
-    report.add_argument(
+    parser.add_argument(
         "--format",
         default="basic",
         help="output format, basic jsonstream or jsonpretty",
     )
-    report.add_argument("--features", nargs="*", help="enable various report features")
-    report.add_argument(
-        "--output", default="-", help='supported are "-" (default) and "workspace"'
-    )
+    parser.add_argument("--features", nargs="*", help="enable various report features")
+    parser.add_argument("--output", default="-", help='supported are "-" (default) and "workspace"')
 
 
 def setup_vacuum_parser(vacuum):
     setup_common(vacuum)
     vacuum.add_argument("verb", choices=["delete", "archive"])
-    vacuum.add_argument("desc", choices=["all", "old", "empty"])
-    vacuum.add_argument("advs", nargs="*", choices=["monits", "logs", "trackfiles"])
+    vacuum.add_argument("desc", choices=["all", "old"])
+    vacuum.add_argument("advs", nargs="*", choices=["monits", "logs"])
     vacuum.add_argument("--dry-run", action="store_true")
 
 
@@ -375,18 +218,14 @@ def parse_arg_fromto(arg):
     return dateutil.parser.parse(arg).astimezone()
 
 
-def serialize_arg_fromto(arg: datetime.datetime) -> str:
+def mk_str_fromto(arg: datetime.datetime) -> str:
     return arg.astimezone().strftime("%Y-%m-%dT%H:%M")
 
 
 def setup_common(parser):
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="print useful troubleshooting info"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="print useful troubleshooting info")
     return parser
 
 
 if __name__ == "__main__":
-    # import sys
-    # sys.argv.extend(['trackdir', 'prep'])
     run_cli()

@@ -2,35 +2,35 @@ import datetime
 import enum
 import logging
 import os
-from pathlib import Path
 from zipfile import ZIP_LZMA, ZipFile
 
 from easytrack.conf import Conf
 
+
 log = logging.getLogger(__name__)
 
 
-class Verb(enum.Enum):
+class Word(enum.Enum):
+    def __str__(self):
+        return self.name.lower()
+
+
+class Verb(Word):
     DELETE = enum.auto()
     ARCHIVE = enum.auto()
 
-    def __str__(self):
-        return self.name.lower()
 
-
-class Desc(enum.Enum):
+class Desc(Word):
     ALL = enum.auto()
     OLD = enum.auto()
-    EMPTY = enum.auto()
 
     def __str__(self):
         return self.name.lower()
 
 
-class Adv(enum.Enum):
+class Adv(Word):
     MONITS = enum.auto()
     LOGS = enum.auto()
-    TRACKFILES = enum.auto()
 
     def __str__(self):
         return self.name.lower()
@@ -52,12 +52,6 @@ def _do_vacuum(conf: Conf, verb: Verb, desc: Desc, adv: Adv, dry_run: bool):
     elif adv == Adv.LOGS:
         log_paths = [conf.track_dir / "logs"]
         archive_paths = [conf.track_dir / "archive" / "logs"]
-    elif adv == Adv.TRACKFILES:
-        log_paths = [conf.track_dir / p for p in ("active", "finished", "exported")]
-        archive_paths = [
-            conf.track_dir / "archive" / "trackfiles" / p
-            for p in ("active", "finished", "exported")
-        ]
     else:
         raise ValueError(f"Unexpected adv {adv}")
 
@@ -132,20 +126,10 @@ def _filter(log_files, desc: Desc):
     if desc == Desc.ALL:
         yield from log_files
         return
+    elif desc != Desc.OLD:
+        raise ValueError(f"Unexpected desc {desc}")
     d_ = (datetime.datetime.now() - datetime.timedelta(days=14)).replace(day=1).date()
     d = datetime.datetime(*d_.timetuple()[:3])
     for tp, dtt, p in log_files:
-        if desc == Desc.OLD:
-            if dtt < d:
-                yield (tp, dtt, p)
-        elif desc == Desc.EMPTY:
-            if "today" not in p:
-                isempty = True
-                for line in Path(p).open():
-                    if line.strip():
-                        isempty = False
-                        break
-                if isempty:
-                    yield (tp, dtt, p)
-        else:
-            raise ValueError(f"Unexpected desc {desc}")
+        if dtt < d:
+            yield (tp, dtt, p)
