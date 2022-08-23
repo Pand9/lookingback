@@ -8,7 +8,7 @@ from subprocess import PIPE, SubprocessError
 from time import sleep
 
 from easytrack.jsonfmt import to_json_file
-from easytrack.time import now, round_time
+from easytrack.time import now
 
 log = logging.getLogger(__name__)
 
@@ -26,8 +26,7 @@ class MonitorState:
     output_dir: Path
 
     def gen_output_path(self) -> Path:
-        ts = now()
-        ts = round_time(ts, self.output_filename_rotate_frequency_minutes)
+        ts = now(round_to_minutes=self.output_filename_rotate_frequency_minutes)
         return self.output_dir / f"monitor.{ts.isoformat('_', 'minutes')}.log"
 
     def run_monitor(self):

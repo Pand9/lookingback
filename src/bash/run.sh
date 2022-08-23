@@ -6,9 +6,7 @@ HELP_PREFIX=$(cat <<-END
 ## This is the help prefix - detailed cli help is at the bottom
 ## Input environment variables
 # - $EASYTRACK_ALERT_METHOD - if "stdout" (default), alerts are not sent other than stdout; suitable for CLI. if "notify-send" provided, notify-send alerts are issued.
-# - $EASYTRACK_LOG_OUTPUT - either "stderr" (default), or "file"
 # - $EASYTRACK_PYTHON_VENV_ACTIVATE - python venv (optional, system python3 used otherwise)
-# - $EASYTRACK_BASH_SOURCE_PATH - defaults to $(dirname $0)/../sh
 # - $EASYTRACK_PY_SOURCE_PATH - defaults to $(dirname $0)/../py
 # - $EASYTRACK_RUST_SOURCE_PATH - used only when EASYTRACK_RUST_REDUCER_BIN_PATH not provided. Defaults to $(dirname $0)/../rust
 # - $EASYTRACK_RUST_REDUCER_BIN_PATH - If not provided, rust binary is ran with cargo build --release in $EASYTRACK_RUST_SOURCE_PATH
@@ -60,7 +58,7 @@ alert() {
 
 if is_help; then echo "$HELP_PREFIX"; fi
 
-variables=(EASYTRACK_ALERT_METHOD EASYTRACK_LOG_OUTPUT EASYTRACK_PYTHON_VENV_ACTIVATE EASYTRACK_BASH_SOURCE_PATH EASYTRACK_PY_SOURCE_PATH EASYTRACK_RUST_SOURCE_PATH EASYTRACK_RUST_REDUCER_BIN_PATH EASYTRACK_RUST_CARGO_RUN_ARGS EASYTRACK_TRACK_DIR)
+variables=(EASYTRACK_ALERT_METHOD EASYTRACK_PYTHON_VENV_ACTIVATE EASYTRACK_PY_SOURCE_PATH EASYTRACK_RUST_SOURCE_PATH EASYTRACK_RUST_REDUCER_BIN_PATH EASYTRACK_RUST_CARGO_RUN_ARGS EASYTRACK_TRACK_DIR)
 
 print_variables () {
     local p
@@ -72,22 +70,12 @@ print_variables () {
 if is_verbose; then >&2 echo "Verbose output enabled"; fi
 if is_verbose; then >&2 echo "Input environment variables:"; print_variables; fi
 
-export EASYTRACK_TRACK_DIR=${EASYTRACK_TRACK_DIR:-$HOME/trackdir}
-
 export EASYTRACK_ALERT_METHOD=${EASYTRACK_ALERT_METHOD:-stdout}
 if [[ "$EASYTRACK_ALERT_METHOD" != stdout && "$EASYTRACK_ALERT_METHOD" != notify-send ]]; then
     >&2 echo "run.sh error - unknown alert method $EASYTRACK_ALERT_METHOD. Supported: notify-send & stdout"
     exit 1
 fi
-export EASYTRACK_LOG_OUTPUT=${EASYTRACK_LOG_OUTPUT:-stderr}
-export EASYTRACK_BASH_SOURCE_PATH=$(dirname $0)
 EASYTRACK_PY_SOURCE_PATH=${EASYTRACK_PY_SOURCE_PATH:-$(dirname $0)/../py}
-if ! [[ $EASYTRACK_RUST_REDUCER_BIN_PATH ]]; then
-    export EASYTRACK_RUST_SOURCE_PATH=${EASYTRACK_RUST_SOURCE_PATH:-$(dirname $0)/../rust}
-else
-    export EASYTRACK_RUST_REDUCER_BIN_PATH
-fi
-EASYTRACK_RUST_CARGO_RUN_ARGS=${EASYTRACK_RUST_CARGO_RUN_ARGS:-"--release"}
 
 if is_verbose; then >&2 echo "Recalculated environment variables:"; print_variables; fi
 

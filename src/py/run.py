@@ -4,6 +4,7 @@ import argparse
 import datetime
 import errno
 import fcntl
+import inspect
 import json
 import logging
 import os
@@ -21,18 +22,9 @@ from easytrack.jsonfmt import to_json
 from easytrack.monitor import MonitorState
 from easytrack.reporter import print_basic_format, transform_report
 from easytrack.time import now
-from easytrack.trackdir import TrackdirTrackfiles
 from easytrack.vacuum import do_vacuum
 
 log = logging.getLogger(__name__)
-
-
-def common_routine(conf: Conf):
-    trackdir = TrackdirTrackfiles(conf)
-    trackdir.parse()
-    log.debug("conf: %s", repr(conf))
-    log.debug("trackdir: %s", repr(trackdir))
-    return trackdir
 
 
 def ensure_rust_bin() -> Tuple[List[str], str]:
@@ -41,10 +33,8 @@ def ensure_rust_bin() -> Tuple[List[str], str]:
     if rust_bin_value is None:
         rust_src = os.getenv("EASYTRACK_RUST_SOURCE_PATH")
         if rust_src is None:
-            bin_var = "EASYTRACK_RUST_REDUCER_BIN_PATH"
-            src_var = "EASYTRACK_RUST_SOURCE_PATH"
-            raise ValueError(f"neither {bin_var}, nor {src_var} provided")
-        cargo_run_args = shlex.split(os.getenv("EASYTRACK_RUST_CARGO_RUN_ARGS") or "")
+            rust_src = f"{os.path.dirname(inspect.getfile(inspect.currentframe()))}/../rust"
+        cargo_run_args = shlex.split(os.getenv("EASYTRACK_RUST_CARGO_RUN_ARGS", "--release"))
         return ["cargo", "run", *cargo_run_args, "--"], rust_src
     else:
         if not os.path.exists(rust_bin_value):
@@ -106,6 +96,10 @@ def _run_monitor(conf: Conf, ticks: int):
     monitor_state.run_monitor()
 
 
+class FlockError(Exception):
+    pass
+
+
 @contextmanager
 def do_lock(lock_path: Path):
     try:
@@ -119,7 +113,7 @@ def do_lock(lock_path: Path):
                     print(lock_path, "locked; trying again in 0.1s", file=sys.stderr)
                     time.sleep(0.1)
                 else:
-                    raise
+                    raise FlockError(f"Locking error for {lock_path}") from e
         yield
     finally:
         fcntl.flock(lock_file, fcntl.LOCK_UN)
@@ -127,13 +121,10 @@ def do_lock(lock_path: Path):
 
 @contextmanager
 def cmddir_lock(conf: Conf, input_args):
-    try:
-        workdir_path = conf.track_dir / input_args.cmd
-        workdir_path.mkdir(parents=True, exist_ok=True)
-        with do_lock(workdir_path / "lock"):
-            yield workdir_path
-    except OSError as e:
-        raise Exception(f"Locking error for {workdir_path}") from e
+    workdir_path = conf.track_dir / input_args.cmd
+    workdir_path.mkdir(parents=True, exist_ok=True)
+    with do_lock(workdir_path / "lock"):
+        yield workdir_path
 
 
 def run_cli():
@@ -149,14 +140,7 @@ def run_cli():
     args = parser.parse_args()
 
     with cmddir_lock(conf, args) as cmddir_path:
-        logging.basicConfig(
-            format="%(asctime)s.%(msecs)03d|%(levelname).1s|%(lineno)3d| %(message)s",
-            datefmt="%F_%T",
-            level="INFO" if not args.verbose else "DEBUG",
-        )
-        logging.getLogger().addHandler(
-            logging.FileHandler(str(cmddir_path / f"{datetime.date.today()}.log"), log_level="INFO")
-        )
+        _init_log(cmddir_path, verbose=args.verbose)
         if args.cmd == "config":
             print(to_json(conf))
         elif args.cmd == "monitor":
@@ -171,6 +155,17 @@ def run_cli():
                 advs=args.advs,
                 dry_run=args.dry_run,
             )
+
+
+def _init_log(cmddir_path, verbose: bool):
+    logging.basicConfig(
+        format="%(asctime)s.%(msecs)03d|%(levelname).1s|%(lineno)3d| %(message)s",
+        datefmt="%F_%T",
+        level="INFO" if not verbose else "DEBUG",
+    )
+    file_handler = logging.FileHandler(str(cmddir_path / f"{datetime.date.today()}.log"))
+    file_handler.setLevel("INFO")
+    logging.getLogger().addHandler(file_handler)
 
 
 def setup_monitor_parser(parser):
