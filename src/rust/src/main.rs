@@ -85,6 +85,9 @@ fn get_filenames(opts: &ReportOpts) -> Result<Vec<PathBuf>> {
                     }
                 };
                 let fname = entry.file_name().to_string_lossy().to_string();
+                if !fname.starts_with("monitor.") {
+                    continue;
+                }
                 let dtime: DateTime<Local> = extract_date(&fname)?;
                 if opts.from > dtime {
                     continue;
